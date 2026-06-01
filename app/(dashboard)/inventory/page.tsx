@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatKRW } from '@/lib/utils'
 import { Search, Plus } from 'lucide-react'
 import Link from 'next/link'
@@ -20,11 +20,11 @@ export default function InventoryPage() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
 
-  const fetchSkus = async (reset = false) => {
+  const fetchSkus = useCallback(async (reset = false, currentCursor: string | null = null) => {
     const params = new URLSearchParams({ limit: '20' })
     if (search) params.set('search', search)
     if (category) params.set('category', category)
-    if (!reset && cursor) params.set('cursor', cursor)
+    if (!reset && currentCursor) params.set('cursor', currentCursor)
 
     const res = await fetch(`/api/sku?${params}`)
     const json = await res.json()
@@ -32,9 +32,9 @@ export default function InventoryPage() {
     else setSkus(prev => [...prev, ...(json.data ?? [])])
     setHasMore(json.meta?.hasMore ?? false)
     setCursor(json.meta?.nextCursor ?? null)
-  }
+  }, [search, category])
 
-  useEffect(() => { setCursor(null); fetchSkus(true) }, [search, category])
+  useEffect(() => { setCursor(null); fetchSkus(true) }, [search, category, fetchSkus])
 
   const isExpiringSoon = (date: string | null) => {
     if (!date) return false
@@ -118,7 +118,7 @@ export default function InventoryPage() {
         </table>
         {hasMore && (
           <div className="p-4 text-center border-t">
-            <button onClick={() => fetchSkus(false)} className="text-sm text-blue-600 hover:text-blue-700">더 보기</button>
+            <button onClick={() => fetchSkus(false, cursor)} className="text-sm text-blue-600 hover:text-blue-700">더 보기</button>
           </div>
         )}
       </div>

@@ -7,8 +7,6 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 // Vercel Cron: 매일 09:00 KST
 export const POST = async () => {
   const now = new Date()
-  const d7 = new Date(now.getTime() + 7 * 86400000)
-  const d30 = new Date(now.getTime() + 30 * 86400000)
   const d60 = new Date(now.getTime() + 60 * 86400000)
 
   const expiringSkus = await prisma.skuMaster.findMany({

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { formatKRW, maskEmail } from '@/lib/utils'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search } from 'lucide-react'
 
 interface Customer {
   id: string; name: string | null; email: string | null; phone: string | null
@@ -30,12 +30,12 @@ export default function CustomersPage() {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const fetchCustomers = useCallback(async (reset = false) => {
+  const fetchCustomers = useCallback(async (reset = false, currentCursor: string | null = null) => {
     setLoading(true)
     const params = new URLSearchParams({ limit: '20' })
     if (search) params.set('search', search)
     if (segment) params.set('segment', segment)
-    if (!reset && cursor) params.set('cursor', cursor)
+    if (!reset && currentCursor) params.set('cursor', currentCursor)
 
     const res = await fetch(`/api/customers?${params}`)
     const json = await res.json()
@@ -47,12 +47,12 @@ export default function CustomersPage() {
     }
     setHasMore(json.meta?.hasMore ?? false)
     setCursor(json.meta?.nextCursor ?? null)
-  }, [search, segment, cursor])
+  }, [search, segment])
 
   useEffect(() => {
     setCursor(null)
     fetchCustomers(true)
-  }, [search, segment])
+  }, [search, segment, fetchCustomers])
 
   return (
     <div className="space-y-4">
@@ -125,7 +125,7 @@ export default function CustomersPage() {
         {hasMore && (
           <div className="p-4 text-center border-t border-gray-100">
             <button
-              onClick={() => fetchCustomers(false)}
+              onClick={() => fetchCustomers(false, cursor)}
               disabled={loading}
               className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
             >

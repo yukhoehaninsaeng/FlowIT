@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/db'
-import type { Prisma } from '@prisma/client'
 
 interface JourneyStep {
   type: 'send_message' | 'delay' | 'condition'

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { prisma } from '@/lib/db'
 import { OrderStatus } from '@prisma/client'
@@ -9,7 +9,6 @@ export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl
   const type = searchParams.get('type') ?? 'sales'
   const period = searchParams.get('period') ?? 'monthly'
-  const channel = searchParams.get('channel')
   const skuId = searchParams.get('skuId')
 
   const now = new Date()

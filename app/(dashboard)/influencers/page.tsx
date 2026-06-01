@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { formatKRW } from '@/lib/utils'
-import { Plus, Star } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 interface Influencer {
   id: string; name: string; channel: string; handle: string; followerCnt: number
