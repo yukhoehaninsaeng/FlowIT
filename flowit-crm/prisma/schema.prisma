@@ -1,0 +1,531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────
+// 시스템 / 인증
+// ─────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         UserRole  @default(MEMBER)
+  groupId      String?
+  group        Group?    @relation(fields: [groupId], references: [id])
+  isActive     Boolean   @default(true)
+  invitedById  String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  auditLogs AuditLog[]
+  campaigns Campaign[]
+  journeys  Journey[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  permissions Json     @default("{}")
+  description String?
+  createdAt   DateTime @default(now())
+
+  users User[]
+
+  @@map("groups")
+}
+
+model InviteToken {
+  id        String    @id @default(cuid())
+  token     String    @unique
+  email     String
+  role      UserRole
+  groupId   String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@map("invite_tokens")
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  action        String
+  resource      String
+  resourceId    String?
+  ip            String
+  userAgent     String?
+  payloadBefore Json?
+  payloadAfter  Json?
+  createdAt     DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────
+// 고객 / CDP
+// ─────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  unifiedId String   @default(cuid())
+  email     String?
+  phone     String?
+  name      String?
+  gender    String?
+  birthYear Int?
+  skinType  String?
+  segment   String   @default("normal")
+  rfmScore  Json?
+  ltv       Decimal  @default(0) @db.Decimal(12, 0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  identities         CustomerIdentity[]
+  events             CustomerEvent[]
+  orders             Order[]
+  campaignSends      CampaignSend[]
+  journeyEnrollments JourneyEnrollment[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([unifiedId])
+  @@index([segment])
+  @@map("customers")
+}
+
+model CustomerIdentity {
+  id              String   @id @default(cuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  channel         Channel
+  channelUserId   String
+  identifierType  String
+  identifierValue String
+  confidenceScore Decimal  @default(1.0) @db.Decimal(3, 2)
+  createdAt       DateTime @default(now())
+
+  @@unique([channel, channelUserId])
+  @@index([customerId])
+  @@index([identifierValue])
+  @@map("customer_identities")
+}
+
+model CustomerEvent {
+  id          String   @id @default(cuid())
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  eventType   String
+  channel     Channel?
+  skuMasterId String?
+  meta        Json     @default("{}")
+  occurredAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@index([eventType])
+  @@index([occurredAt])
+  @@map("customer_events")
+}
+
+// ─────────────────────────────────────────
+// 상품 / SKU
+// ─────────────────────────────────────────
+
+enum Channel {
+  OWN_MALL
+  OLIVEYOUNG
+  COUPANG
+  NAVER
+  INSTAGRAM
+  YOUTUBE
+}
+
+model SkuMaster {
+  id           String    @id @default(cuid())
+  skuCode      String    @unique
+  name         String
+  category     String
+  subCategory  String?
+  ingredients  Json      @default("[]")
+  unitCost     Decimal   @db.Decimal(10, 0)
+  sellingPrice Decimal   @db.Decimal(10, 0)
+  lotExpiry    DateTime?
+  isBundle     Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  aliases     SkuAlias[]
+  bundleItems SkuBundle[] @relation("BundleSku")
+  components  SkuBundle[] @relation("ComponentSku")
+  inventory   Inventory[]
+  orderItems  OrderItem[]
+  vocReviews  VocReview[]
+
+  @@index([category])
+  @@index([isBundle])
+  @@map("sku_master")
+}
+
+model SkuAlias {
+  id          String    @id @default(cuid())
+  skuMasterId String
+  skuMaster   SkuMaster @relation(fields: [skuMasterId], references: [id])
+  channel     Channel
+  aliasCode   String
+  aliasName   String
+  isVerified  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([channel, aliasCode])
+  @@map("sku_aliases")
+}
+
+model SkuBundle {
+  id             String    @id @default(cuid())
+  bundleSkuId    String
+  bundleSku      SkuMaster @relation("BundleSku", fields: [bundleSkuId], references: [id])
+  componentSkuId String
+  componentSku   SkuMaster @relation("ComponentSku", fields: [componentSkuId], references: [id])
+  qty            Int
+  costRatio      Decimal   @db.Decimal(5, 4)
+  isGift         Boolean   @default(false)
+
+  @@map("sku_bundles")
+}
+
+model Inventory {
+  id           String    @id @default(cuid())
+  skuMasterId  String
+  skuMaster    SkuMaster @relation(fields: [skuMasterId], references: [id])
+  channel      Channel
+  qtyAvailable Int       @default(0)
+  qtyReserved  Int       @default(0)
+  reorderPoint Int       @default(0)
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([skuMasterId, channel])
+  @@map("inventory")
+}
+
+// ─────────────────────────────────────────
+// 주문
+// ─────────────────────────────────────────
+
+model Order {
+  id             String      @id @default(cuid())
+  customerId     String
+  customer       Customer    @relation(fields: [customerId], references: [id])
+  channel        Channel
+  channelOrderId String
+  totalAmount    Decimal     @db.Decimal(12, 0)
+  discountAmount Decimal     @default(0) @db.Decimal(12, 0)
+  status         OrderStatus @default(PENDING)
+  orderedAt      DateTime
+  createdAt      DateTime    @default(now())
+
+  items OrderItem[]
+
+  @@unique([channel, channelOrderId])
+  @@index([customerId])
+  @@index([channel])
+  @@index([orderedAt])
+  @@index([status])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+model OrderItem {
+  id           String    @id @default(cuid())
+  orderId      String
+  order        Order     @relation(fields: [orderId], references: [id])
+  skuMasterId  String
+  skuMaster    SkuMaster @relation(fields: [skuMasterId], references: [id])
+  qty          Int
+  unitPrice    Decimal   @db.Decimal(10, 0)
+  lotNumber    String?
+  isBundleItem Boolean   @default(false)
+  parentItemId String?
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model ChannelOrderRaw {
+  id           String   @id @default(cuid())
+  channel      Channel
+  rawJson      Json
+  processed    Boolean  @default(false)
+  errorMessage String?
+  ingestedAt   DateTime @default(now())
+
+  @@index([channel, processed])
+  @@index([ingestedAt])
+  @@map("channel_orders_raw")
+}
+
+// ─────────────────────────────────────────
+// 마케팅
+// ─────────────────────────────────────────
+
+model Campaign {
+  id            String         @id @default(cuid())
+  name          String
+  type          CampaignType
+  status        CampaignStatus @default(DRAFT)
+  segmentFilter Json           @default("{}")
+  messageA      String         @db.Text
+  messageB      String?        @db.Text
+  abEnabled     Boolean        @default(false)
+  abRatioA      Int            @default(50)
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  createdById   String
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  createdAt     DateTime       @default(now())
+
+  sends CampaignSend[]
+
+  @@index([status])
+  @@map("campaigns")
+}
+
+enum CampaignType {
+  EMAIL
+  KAKAO_ALIMTALK
+  SMS
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  DONE
+  PAUSED
+}
+
+model CampaignSend {
+  id          String    @id @default(cuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id])
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  variant     String    @default("A")
+  status      String    @default("sent")
+  revenueAttr Decimal   @default(0) @db.Decimal(12, 0)
+  sentAt      DateTime  @default(now())
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  convertedAt DateTime?
+
+  @@index([campaignId])
+  @@index([customerId])
+  @@map("campaign_sends")
+}
+
+model Journey {
+  id            String   @id @default(cuid())
+  name          String
+  triggerType   String
+  triggerConfig Json     @default("{}")
+  steps         Json     @default("[]")
+  isActive      Boolean  @default(false)
+  createdById   String
+  createdBy     User     @relation(fields: [createdById], references: [id])
+  createdAt     DateTime @default(now())
+
+  enrollments JourneyEnrollment[]
+
+  @@map("journeys")
+}
+
+model JourneyEnrollment {
+  id          String    @id @default(cuid())
+  journeyId   String
+  journey     Journey   @relation(fields: [journeyId], references: [id])
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  currentStep Int       @default(0)
+  status      String    @default("active")
+  nextRunAt   DateTime?
+  enrolledAt  DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([journeyId, customerId])
+  @@index([status, nextRunAt])
+  @@map("journey_enrollments")
+}
+
+model Influencer {
+  id            String   @id @default(cuid())
+  name          String
+  channel       Channel
+  handle        String
+  followerCnt   Int      @default(0)
+  avgEngagement Decimal  @default(0) @db.Decimal(5, 2)
+  avgRoi        Decimal  @default(0) @db.Decimal(8, 2)
+  skinTypeFocus String?
+  categoryFocus Json     @default("[]")
+  contact       String?
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+
+  campaigns InfluencerCampaign[]
+
+  @@map("influencers")
+}
+
+model InfluencerCampaign {
+  id                String     @id @default(cuid())
+  influencerId      String
+  influencer        Influencer @relation(fields: [influencerId], references: [id])
+  campaignId        String?
+  utmCode           String     @unique
+  couponCode        String?
+  fee               Decimal    @db.Decimal(12, 0)
+  revenueAttributed Decimal    @default(0) @db.Decimal(12, 0)
+  roi               Decimal    @default(0) @db.Decimal(8, 2)
+  startedAt         DateTime
+  endedAt           DateTime?
+
+  @@map("influencer_campaigns")
+}
+
+// ─────────────────────────────────────────
+// VOC / 리뷰
+// ─────────────────────────────────────────
+
+model VocReview {
+  id              String    @id @default(cuid())
+  skuMasterId     String
+  skuMaster       SkuMaster @relation(fields: [skuMasterId], references: [id])
+  channel         Channel
+  channelReviewId String?
+  rating          Int
+  content         String    @db.Text
+  sentiment       String?
+  tags            Json      @default("[]")
+  lotNumber       String?
+  isAlert         Boolean   @default(false)
+  ingestedAt      DateTime  @default(now())
+  analyzedAt      DateTime?
+
+  @@index([skuMasterId])
+  @@index([sentiment])
+  @@index([isAlert])
+  @@index([ingestedAt])
+  @@map("voc_reviews")
+}
+
+// ─────────────────────────────────────────
+// 영업 파이프라인
+// ─────────────────────────────────────────
+
+model Account {
+  id           String   @id @default(cuid())
+  name         String
+  type         String
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  paymentTerms String?
+  notes        String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  deals Deal[]
+
+  @@map("accounts")
+}
+
+model Deal {
+  id            String    @id @default(cuid())
+  accountId     String
+  account       Account   @relation(fields: [accountId], references: [id])
+  title         String
+  stage         DealStage @default(LEAD)
+  amount        Decimal   @db.Decimal(12, 0)
+  probability   Int       @default(50)
+  assigneeId    String?
+  expectedClose DateTime?
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([stage])
+  @@index([assigneeId])
+  @@map("deals")
+}
+
+enum DealStage {
+  LEAD
+  MEETING
+  QUOTE
+  REVIEW
+  CLOSED
+}
+
+// ─────────────────────────────────────────
+// 관리자
+// ─────────────────────────────────────────
+
+model ApiConnection {
+  id             String    @id @default(cuid())
+  name           String
+  channel        Channel
+  endpoint       String
+  authType       String
+  tokenEncrypted String?
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  status         String    @default("unknown")
+  lastLatencyMs  Int?
+  lastCheckedAt  DateTime?
+  errorMessage   String?
+  createdAt      DateTime  @default(now())
+
+  @@map("api_connections")
+}
+
+model BiCache {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  data       Json
+  computedAt DateTime @default(now())
+
+  @@map("bi_cache")
+}
