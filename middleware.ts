@@ -1,5 +1,9 @@
-import { auth } from '@/lib/auth'
+import NextAuth from 'next-auth'
+import { authConfig } from '@/lib/auth.config'
 import { NextResponse } from 'next/server'
+
+// auth.config.ts만 import → pg/bcryptjs/prisma가 Edge Runtime에 포함되지 않음
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth

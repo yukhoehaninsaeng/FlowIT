@@ -3,6 +3,7 @@ const nextConfig = {
   experimental: {
     serverActions: { allowedOrigins: ['localhost:3000'] }
   },
+  serverExternalPackages: ['pg', '@prisma/adapter-pg', '@prisma/client', 'bcryptjs'],
   images: {
     remotePatterns: [{ protocol: 'https', hostname: '**.supabase.co' }]
   }
