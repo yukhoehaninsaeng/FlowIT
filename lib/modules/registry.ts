@@ -2,11 +2,11 @@ import {
   LayoutDashboard, Users, TrendingUp, Package, Megaphone,
   GitBranch, Star, MessageSquare, BarChart3,
   ShoppingCart, Warehouse, Truck, RotateCcw, Receipt,
-  BrainCircuit, ClipboardList
+  BrainCircuit, ClipboardList, FileText, DollarSign, Phone
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type ModuleCategory = 'core' | 'marketing' | 'logistics' | 'analytics'
+export type ModuleCategory = 'core' | 'marketing' | 'logistics' | 'analytics' | 'sales'
 
 export interface ModuleDef {
   key: string
@@ -19,6 +19,34 @@ export interface ModuleDef {
 }
 
 export const MODULE_REGISTRY: ModuleDef[] = [
+  // ── sales ──────────────────────────────────
+  {
+    key: 'contact_logs',
+    label: '상담 이력',
+    href: '/contact-logs',
+    icon: Phone,
+    category: 'sales',
+    description: '이메일 자동 동기화, 도메인 기반 거래처 매칭, 상담 타임라인',
+    defaultEnabled: true,
+  },
+  {
+    key: 'quotes',
+    label: '견적 관리',
+    href: '/quotes',
+    icon: FileText,
+    category: 'sales',
+    description: '견적서 작성, PDF 출력, 버전 관리, 승인 워크플로우',
+    defaultEnabled: true,
+  },
+  {
+    key: 'receivables',
+    label: '미수금 관리',
+    href: '/receivables',
+    icon: DollarSign,
+    category: 'sales',
+    description: '청구서 관리, 입금 추적, 연체 현황, 거래처별 미수금',
+    defaultEnabled: true,
+  },
   // ── core ───────────────────────────────────
   {
     key: 'dashboard',
@@ -171,26 +199,31 @@ export const MODULE_REGISTRY: ModuleDef[] = [
 
 export const INDUSTRY_PRESETS: Record<string, string[]> = {
   cosmetics: [
+    'contact_logs', 'quotes', 'receivables',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'journeys', 'influencers', 'voc', 'bi',
   ],
   logistics: [
+    'contact_logs', 'quotes', 'receivables',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'settlements', 'lot_management', 'ai_forecast', 'bi',
   ],
   food: [
+    'contact_logs', 'quotes', 'receivables',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'lot_management', 'voc', 'bi',
   ],
   general: [
+    'contact_logs', 'quotes', 'receivables',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'bi',
   ],
 }
 
 export const CATEGORY_LABELS: Record<ModuleCategory, string> = {
+  sales: '영업·거래',
   core: '핵심',
   marketing: '마케팅',
   logistics: '물류·유통',

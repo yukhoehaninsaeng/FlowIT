@@ -415,19 +415,27 @@ model VocReview {
 // ─────────────────────────────────────────
 
 model Account {
-  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name         String
-  type         String
-  contactName  String?  @map("contact_name")
-  contactPhone String?  @map("contact_phone")
-  contactEmail String?  @map("contact_email")
-  address      String?
-  paymentTerms String?  @map("payment_terms")
-  notes        String?
-  createdAt    DateTime @default(now()) @map("created_at")
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String
+  type           String   @default("prospect") // prospect | customer | partner | vendor
+  industry       String?
+  contactName    String?  @map("contact_name")
+  contactPhone   String?  @map("contact_phone")
+  contactEmail   String?  @map("contact_email")
+  emailDomain    String?  @map("email_domain")  // 도메인 자동 추출 (ex: samsung.com)
+  address        String?
+  paymentTerms   String?  @map("payment_terms")
+  creditLimit    Decimal? @map("credit_limit") @db.Decimal(15, 2)
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
-  deals Deal[]
+  deals          Deal[]
+  contactLogs    ContactLog[]
+  quotes         Quote[]
+  receivables    Receivable[]
 
+  @@index([emailDomain])
   @@map("accounts")
 }
 
@@ -441,13 +449,152 @@ model Deal {
   probability   Int       @default(50)
   assigneeId    String?   @map("assignee_id") @db.Uuid
   expectedClose DateTime? @map("expected_close")
+  stageChangedAt DateTime? @map("stage_changed_at")
   notes         String?
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
+  contactLogs   ContactLog[]
+  quotes        Quote[]
+  receivables   Receivable[]
+
   @@index([stage])
   @@index([assigneeId])
   @@map("deals")
+}
+
+// ─────────────────────────────────────────
+// 상담 이력
+// ─────────────────────────────────────────
+
+model ContactLog {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId      String?   @map("account_id") @db.Uuid
+  account        Account?  @relation(fields: [accountId], references: [id])
+  dealId         String?   @map("deal_id") @db.Uuid
+  deal           Deal?     @relation(fields: [dealId], references: [id])
+  type           String    @default("manual") // email | call | visit | kakao | zoom | manual
+  direction      String?   // inbound | outbound
+  subject        String?
+  summary        String?   @db.Text
+  fromEmail      String?   @map("from_email")
+  toEmails       String[]  @map("to_emails")
+  ccEmails       String[]  @map("cc_emails")
+  externalId     String?   @map("external_id")     // Gmail Message-ID
+  threadId       String?   @map("thread_id")        // Gmail Thread-ID
+  attachments    Json?
+  nextAction     String?   @map("next_action")
+  nextActionDate DateTime? @map("next_action_date")
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  createdById    String?   @map("created_by") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([accountId])
+  @@index([dealId])
+  @@index([externalId])
+  @@index([occurredAt])
+  @@map("contact_logs")
+}
+
+model EmailSync {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider     String    // 'gmail' | 'outlook' | 'imap'
+  emailAddress String    @unique @map("email_address")
+  displayName  String?   @map("display_name")
+  accessToken  String?   @map("access_token")   @db.Text
+  refreshToken String?   @map("refresh_token")  @db.Text
+  tokenExpiry  DateTime? @map("token_expiry")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  historyId    String?   @map("history_id")     // Gmail incremental sync
+  isActive     Boolean   @default(true) @map("is_active")
+  createdById  String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("email_syncs")
+}
+
+// ─────────────────────────────────────────
+// 견적 관리
+// ─────────────────────────────────────────
+
+model Quote {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  quoteNo      String    @unique @map("quote_no")  // QT-2024-0001
+  accountId    String?   @map("account_id") @db.Uuid
+  account      Account?  @relation(fields: [accountId], references: [id])
+  dealId       String?   @map("deal_id") @db.Uuid
+  deal         Deal?     @relation(fields: [dealId], references: [id])
+  version      Int       @default(1)
+  parentId     String?   @map("parent_id") @db.Uuid  // 이전 버전
+  status       String    @default("draft") // draft | sent | accepted | rejected | expired
+  title        String
+  items        Json      // [{name, qty, unitPrice, discount, total}]
+  subtotal     Decimal   @db.Decimal(15, 2)
+  taxRate      Decimal   @default(10) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount    Decimal   @map("tax_amount") @db.Decimal(15, 2)
+  totalAmount  Decimal   @map("total_amount") @db.Decimal(15, 2)
+  validUntil   DateTime? @map("valid_until")
+  notes        String?   @db.Text
+  terms        String?   @db.Text
+  approvedById String?   @map("approved_by") @db.Uuid
+  approvedAt   DateTime? @map("approved_at")
+  sentAt       DateTime? @map("sent_at")
+  createdById  String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  receivables Receivable[]
+
+  @@index([accountId])
+  @@index([dealId])
+  @@index([status])
+  @@map("quotes")
+}
+
+// ─────────────────────────────────────────
+// 미수금 관리
+// ─────────────────────────────────────────
+
+model Receivable {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceNo    String    @unique @map("invoice_no")  // INV-2024-0001
+  accountId    String    @map("account_id") @db.Uuid
+  account      Account   @relation(fields: [accountId], references: [id])
+  dealId       String?   @map("deal_id") @db.Uuid
+  deal         Deal?     @relation(fields: [dealId], references: [id])
+  quoteId      String?   @map("quote_id") @db.Uuid
+  quote        Quote?    @relation(fields: [quoteId], references: [id])
+  amount       Decimal   @db.Decimal(15, 2)
+  paidAmount   Decimal   @default(0) @map("paid_amount") @db.Decimal(15, 2)
+  dueDate      DateTime  @map("due_date")
+  status       String    @default("unpaid") // unpaid | partial | paid | overdue
+  notes        String?
+  createdById  String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  payments ReceivablePayment[]
+
+  @@index([accountId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("receivables")
+}
+
+model ReceivablePayment {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  receivableId  String     @map("receivable_id") @db.Uuid
+  receivable    Receivable @relation(fields: [receivableId], references: [id], onDelete: Cascade)
+  amount        Decimal    @db.Decimal(15, 2)
+  method        String?    // bank | card | cash | check
+  bankRef       String?    @map("bank_ref")
+  notes         String?
+  paidAt        DateTime   @map("paid_at")
+  createdById   String?    @map("created_by") @db.Uuid
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  @@index([receivableId])
+  @@map("receivable_payments")
 }
 
 // ─────────────────────────────────────────
