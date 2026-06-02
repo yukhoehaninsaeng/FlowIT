@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/client'
 
 const schema = z.object({
   email: z.string().email('올바른 이메일을 입력하세요'),
@@ -26,13 +25,13 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true)
     setError('')
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
     })
     setLoading(false)
-    if (error) {
+    if (!res.ok) {
       setError('이메일 또는 비밀번호가 올바르지 않습니다')
     } else {
       router.push('/')
