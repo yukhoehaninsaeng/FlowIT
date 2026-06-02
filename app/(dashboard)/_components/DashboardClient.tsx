@@ -1,12 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { formatKRW } from '@/lib/utils'
+import Link from 'next/link'
+import { formatKRW, cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { TrendingUp, Users, CreditCard, AlertCircle, Settings, Eye, EyeOff, GripVertical, CheckCircle } from 'lucide-react'
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useModules } from '@/lib/hooks/useModules'
+import { MODULE_REGISTRY, CATEGORY_LABELS, type ModuleCategory } from '@/lib/modules/registry'
+import { usePathname } from 'next/navigation'
 
 // ── 위젯 정의 ──────────────────────────────────────────────────
 const WIDGET_DEFS = [
@@ -45,6 +49,62 @@ interface KpiData {
 interface CustomerKpi { total: number; active: number; vip: number; churnRisk: number; avgLtv: string | null }
 interface AuditLog { id: string; action: string; resource: string; user: { name: string }; createdAt: string }
 interface DealSummary { stage: string; count: number; totalAmount: number }
+
+// ── 모바일 메뉴 그리드 ─────────────────────────────────────────
+const CATEGORY_ORDER: ModuleCategory[] = ['core', 'master', 'sales', 'marketing', 'logistics', 'analytics']
+const CATEGORY_COLORS: Record<string, string> = {
+  core: 'bg-blue-600', master: 'bg-purple-600', sales: 'bg-green-600',
+  marketing: 'bg-orange-500', logistics: 'bg-cyan-600', analytics: 'bg-indigo-600',
+}
+
+function MobileMenuGrid() {
+  const { modules } = useModules()
+  const pathname = usePathname()
+  const nonDashboard = modules.filter(m => m.key !== 'dashboard')
+  const grouped = CATEGORY_ORDER.reduce<Record<string, typeof nonDashboard>>((acc, cat) => {
+    const items = nonDashboard.filter(m => MODULE_REGISTRY.find(d => d.key === m.key)?.category === cat)
+    if (items.length) acc[cat] = items
+    return acc
+  }, {})
+
+  return (
+    <div className="space-y-6 pb-4">
+      <div>
+        <h1 className="text-lg font-semibold text-gray-900">메뉴</h1>
+        <p className="text-xs text-gray-400 mt-0.5">{new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      </div>
+      {CATEGORY_ORDER.map(cat => {
+        const items = grouped[cat]
+        if (!items?.length) return null
+        const color = CATEGORY_COLORS[cat] ?? 'bg-gray-600'
+        return (
+          <div key={cat}>
+            <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">{CATEGORY_LABELS[cat]}</p>
+            <div className="grid grid-cols-3 gap-3">
+              {items.map(({ key, href, label }) => {
+                const def = MODULE_REGISTRY.find(d => d.key === key)
+                const Icon = def?.icon
+                const active = pathname === href || pathname.startsWith(href + '/')
+                return (
+                  <Link key={key} href={href}
+                    className={cn(
+                      'flex flex-col items-center gap-2 p-3 rounded-2xl bg-white border transition-all',
+                      active ? 'border-blue-400 bg-blue-50' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                    )}>
+                    <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center', color)}>
+                      {Icon && <Icon size={20} className="text-white" />}
+                    </div>
+                    <span className="text-[11px] text-gray-700 text-center leading-tight font-medium">{label}</span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────
 export default function DashboardClient() {
@@ -109,6 +169,14 @@ export default function DashboardClient() {
 
   return (
     <div>
+      {/* 모바일: 메뉴 그리드 */}
+      <div className="lg:hidden">
+        <MobileMenuGrid />
+      </div>
+
+      {/* 데스크톱: 대시보드 */}
+      <div className="hidden lg:block">
+
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -241,6 +309,8 @@ export default function DashboardClient() {
           }
         })}
       </div>
+
+      </div> {/* end desktop block */}
     </div>
   )
 }
