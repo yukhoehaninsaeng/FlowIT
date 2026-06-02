@@ -14,7 +14,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  if (isWebhook) return NextResponse.next()
+  if (isWebhook || pathname.startsWith('/api/auth')) return NextResponse.next()
 
   const session = request.cookies.get('session')
   if (!session && !isAuthPage) {
