@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { formatKRW, maskEmail } from '@/lib/utils'
-import { Search, Plus, X, Loader2 } from 'lucide-react'
+import { Search, Plus, X, Loader2, Pencil } from 'lucide-react'
 
 interface Customer {
   id: string; name: string | null; email: string | null; phone: string | null
   segment: string; ltv: string; skinType: string | null
+  gender: string | null; birthYear: number | null
 }
 
 const SEGMENTS = ['', 'vip', 'loyal', 'normal', 'churn_risk', 'new']
@@ -32,6 +33,7 @@ export default function CustomersPage() {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -53,13 +55,30 @@ export default function CustomersPage() {
 
   useEffect(() => { setCursor(null); fetchCustomers(true) }, [search, segment, fetchCustomers])
 
-  async function handleCreate() {
+  function openCreate() {
+    setEditId(null); setForm(DEFAULT_FORM); setError(''); setShowModal(true)
+  }
+
+  function openEdit(c: Customer) {
+    setEditId(c.id)
+    setForm({
+      name: c.name ?? '',
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      gender: c.gender ?? '',
+      birthYear: c.birthYear ? String(c.birthYear) : '',
+      skinType: c.skinType ?? '',
+      segment: c.segment,
+    })
+    setError(''); setShowModal(true)
+  }
+
+  async function handleSave() {
     if (!form.name && !form.email && !form.phone) {
       setError('이름, 이메일, 전화번호 중 하나는 필수입니다.')
       return
     }
-    setSaving(true)
-    setError('')
+    setSaving(true); setError('')
     try {
       const body: Record<string, unknown> = {}
       if (form.name) body.name = form.name
@@ -70,22 +89,14 @@ export default function CustomersPage() {
       if (form.skinType) body.skinType = form.skinType
       if (form.segment) body.segment = form.segment
 
-      const r = await fetch('/api/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!r.ok) {
-        const d = await r.json()
-        setError(d.error ?? '등록에 실패했습니다.')
-        return
-      }
-      setShowModal(false)
-      setForm(DEFAULT_FORM)
+      const r = editId
+        ? await fetch(`/api/customers/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+      if (!r.ok) { const d = await r.json(); setError(d.error ?? '저장에 실패했습니다.'); return }
+      setShowModal(false); setForm(DEFAULT_FORM); setEditId(null)
       fetchCustomers(true)
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   function Field({ label, name, type = 'text', placeholder = '' }: { label: string; name: keyof typeof form; type?: string; placeholder?: string }) {
@@ -107,38 +118,26 @@ export default function CustomersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">고객</h1>
-        <button
-          onClick={() => { setShowModal(true); setError('') }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-        >
+        <button onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
           <Plus size={14} /> 고객 등록
         </button>
       </div>
 
-      {/* 검색/필터 */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="이름, 이메일, 전화번호 검색"
-            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
-        <select
-          value={segment}
-          onChange={e => setSegment(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <select value={segment} onChange={e => setSegment(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">전체 세그먼트</option>
-          {SEGMENTS.filter(Boolean).map(s => (
-            <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>
-          ))}
+          {SEGMENTS.filter(Boolean).map(s => <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>)}
         </select>
       </div>
 
-      {/* 테이블 */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -148,6 +147,7 @@ export default function CustomersPage() {
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">전화번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">세그먼트</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">LTV</th>
+              <th className="w-10" />
             </tr>
           </thead>
           <tbody>
@@ -166,10 +166,15 @@ export default function CustomersPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right text-gray-900 font-medium">{formatKRW(Number(c.ltv))}</td>
+                <td className="px-4 py-2">
+                  <button onClick={() => openEdit(c)} className="p-1 text-gray-300 hover:text-blue-500 rounded">
+                    <Pencil size={13} />
+                  </button>
+                </td>
               </tr>
             ))}
             {customers.length === 0 && !loading && (
-              <tr><td colSpan={5} className="text-center py-12 text-gray-400 text-sm">고객이 없습니다</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">고객이 없습니다</td></tr>
             )}
           </tbody>
         </table>
@@ -183,21 +188,18 @@ export default function CustomersPage() {
         )}
       </div>
 
-      {/* 등록 모달 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-sm font-semibold text-gray-900">고객 등록</h2>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={18} />
-              </button>
+              <h2 className="text-sm font-semibold text-gray-900">{editId ? '고객 수정' : '고객 등록'}</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="px-6 py-5 space-y-3">
               {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
               <Field label="이름" name="name" placeholder="홍길동" />
-              <Field label="이메일" name="email" type="email" placeholder="hong@company.com" />
-              <Field label="전화번호" name="phone" placeholder="010-0000-0000" />
+              {!editId && <Field label="이메일" name="email" type="email" placeholder="hong@company.com" />}
+              {!editId && <Field label="전화번호" name="phone" placeholder="010-0000-0000" />}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">성별</label>
@@ -215,9 +217,7 @@ export default function CustomersPage() {
                   <label className="block text-xs text-gray-500 mb-1">세그먼트</label>
                   <select value={form.segment} onChange={e => setForm(p => ({ ...p, segment: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white">
-                    {SEGMENTS.filter(Boolean).map(s => (
-                      <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>
-                    ))}
+                    {SEGMENTS.filter(Boolean).map(s => <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -235,12 +235,11 @@ export default function CustomersPage() {
               </div>
             </div>
             <div className="flex gap-2 px-6 py-4 border-t border-gray-200">
-              <button onClick={handleCreate} disabled={saving}
+              <button onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {saving && <Loader2 size={13} className="animate-spin" />} 등록
+                {saving && <Loader2 size={13} className="animate-spin" />} {editId ? '저장' : '등록'}
               </button>
-              <button onClick={() => setShowModal(false)}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">취소</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">취소</button>
             </div>
           </div>
         </div>

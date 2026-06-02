@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { formatKRW } from '@/lib/utils'
 import { Search, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Sku {
   id: string; skuCode: string; name: string; category: string; sellingPrice: string
@@ -14,6 +15,7 @@ interface Sku {
 const CATEGORIES = ['', 'skincare', 'makeup', 'suncare', 'bodycare', 'haircare']
 
 export default function InventoryPage() {
+  const router = useRouter()
   const [skus, setSkus] = useState<Sku[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -45,7 +47,7 @@ export default function InventoryPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">재고·SKU</h1>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">
+        <button onClick={() => router.push('/products')} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">
           <Plus size={14} />
           SKU 추가
         </button>

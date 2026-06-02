@@ -9,9 +9,10 @@ const updateSchema = z.object({
   name: z.string().optional(),
   category: z.string().optional(),
   subCategory: z.string().optional(),
+  unit: z.string().optional(),
   ingredients: z.array(z.string()).optional(),
-  unitCost: z.number().int().positive().optional(),
-  sellingPrice: z.number().int().positive().optional(),
+  unitCost: z.number().nonnegative().optional(),
+  sellingPrice: z.number().nonnegative().optional(),
   lotExpiry: z.string().datetime().optional(),
   isActive: z.boolean().optional()
 })

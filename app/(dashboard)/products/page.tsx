@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatKRW } from '@/lib/utils'
-import { Search, Plus, X, Loader2, Package, Link2, Trash2, ChevronDown, ChevronUp, Tag } from 'lucide-react'
+import { Search, Plus, X, Loader2, Package, Link2, Trash2, ChevronDown, ChevronUp, Tag, Pencil } from 'lucide-react'
 
 interface Product {
   id: string
@@ -53,6 +53,12 @@ export default function ProductsPage() {
   const [hasMore, setHasMore] = useState(false)
   const [newCatInput, setNewCatInput] = useState('')
   const [showCatInput, setShowCatInput] = useState(false)
+
+  // 수정 모달
+  const [editProduct, setEditProduct] = useState<Product | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', category: '', subCategory: '', unit: '', unitCost: '', sellingPrice: '' })
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState('')
 
   // 거래처 매핑 관련
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -147,6 +153,45 @@ export default function ProductsPage() {
       setShowForm(false); setForm(DEFAULT_FORM)
       setCursor(null); fetchProducts(true)
     } finally { setSaving(false) }
+  }
+
+  function openEdit(p: Product) {
+    setEditProduct(p)
+    setEditForm({
+      name: p.name,
+      category: p.category,
+      subCategory: p.subCategory ?? '',
+      unit: p.unit ?? '',
+      unitCost: p.unitCost ? String(Number(p.unitCost)) : '',
+      sellingPrice: p.sellingPrice ? String(Number(p.sellingPrice)) : '',
+    })
+    setEditError('')
+  }
+
+  async function handleEditSave() {
+    if (!editProduct || !editForm.name.trim() || !editForm.category.trim()) {
+      setEditError('상품명과 카테고리는 필수입니다.')
+      return
+    }
+    setEditSaving(true); setEditError('')
+    try {
+      const r = await fetch(`/api/sku/${editProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          category: editForm.category,
+          subCategory: editForm.subCategory || undefined,
+          unit: editForm.unit || undefined,
+          unitCost: editForm.unitCost ? Number(editForm.unitCost) : undefined,
+          sellingPrice: editForm.sellingPrice ? Number(editForm.sellingPrice) : undefined,
+        }),
+      })
+      if (!r.ok) { const d = await r.json(); setEditError(d.error ?? '수정 실패'); return }
+      addCategory(editForm.category)
+      setEditProduct(null)
+      setCursor(null); fetchProducts(true)
+    } finally { setEditSaving(false) }
   }
 
   async function toggleExpand(productId: string) {
@@ -388,14 +433,19 @@ export default function ProductsPage() {
                     {product.sellingPrice ? formatKRW(Number(product.sellingPrice)) : '—'}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => toggleExpand(product.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                    >
-                      <Link2 size={12} />
-                      거래처
-                      {expandedId === product.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => toggleExpand(product.id)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      >
+                        <Link2 size={12} />
+                        거래처
+                        {expandedId === product.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
+                      <button onClick={() => openEdit(product)} className="p-1 text-gray-300 hover:text-blue-500 rounded">
+                        <Pencil size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
                 {expandedId === product.id && (
@@ -489,6 +539,74 @@ export default function ProductsPage() {
           </div>
         )}
       </div>
+      {editProduct && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">상품 수정 — {editProduct.skuCode}</h2>
+              <button onClick={() => setEditProduct(null)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              {editError && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{editError}</p>}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">상품명 *</label>
+                <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">카테고리 * — 클릭하거나 직접 입력</label>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {allCategories.map(cat => (
+                    <button key={cat} type="button"
+                      onClick={() => setEditForm(p => ({ ...p, category: cat }))}
+                      className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${editForm.category === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'}`}>
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+                <input value={editForm.category} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))}
+                  placeholder="새 카테고리 직접 입력"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">서브 카테고리</label>
+                  <input value={editForm.subCategory} onChange={e => setEditForm(p => ({ ...p, subCategory: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">단위</label>
+                  <input value={editForm.unit} onChange={e => setEditForm(p => ({ ...p, unit: e.target.value }))}
+                    list="edit-unit-list"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <datalist id="edit-unit-list">
+                    {UNITS.map(u => <option key={u} value={u} />)}
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">매입 단가 (원)</label>
+                  <input type="number" min={0} value={editForm.unitCost} onChange={e => setEditForm(p => ({ ...p, unitCost: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  {editForm.unitCost && <p className="text-xs text-gray-400 mt-0.5">{formatKRW(Number(editForm.unitCost))}</p>}
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">판매 단가 (원)</label>
+                  <input type="number" min={0} value={editForm.sellingPrice} onChange={e => setEditForm(p => ({ ...p, sellingPrice: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  {editForm.sellingPrice && <p className="text-xs text-gray-400 mt-0.5">{formatKRW(Number(editForm.sellingPrice))}</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 px-6 py-4 border-t border-gray-200">
+              <button onClick={handleEditSave} disabled={editSaving}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {editSaving && <Loader2 size={13} className="animate-spin" />} 저장
+              </button>
+              <button onClick={() => setEditProduct(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
