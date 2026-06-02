@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, TrendingUp, Package, Megaphone,
   GitBranch, Star, MessageSquare, BarChart3,
   ShoppingCart, Warehouse, Truck, RotateCcw, Receipt,
-  BrainCircuit, ClipboardList, FileText, DollarSign, Phone
+  BrainCircuit, ClipboardList, FileText, DollarSign, Phone, Building2
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -45,6 +45,15 @@ export const MODULE_REGISTRY: ModuleDef[] = [
     icon: DollarSign,
     category: 'sales',
     description: '청구서 관리, 입금 추적, 연체 현황, 거래처별 미수금',
+    defaultEnabled: true,
+  },
+  {
+    key: 'accounts',
+    label: '거래처',
+    href: '/accounts',
+    icon: Building2,
+    category: 'sales',
+    description: '거래처 정보, 담당자, 딜·상담·미수금 연결 관리',
     defaultEnabled: true,
   },
   // ── core ───────────────────────────────────
@@ -199,24 +208,24 @@ export const MODULE_REGISTRY: ModuleDef[] = [
 
 export const INDUSTRY_PRESETS: Record<string, string[]> = {
   cosmetics: [
-    'contact_logs', 'quotes', 'receivables',
+    'contact_logs', 'quotes', 'receivables', 'accounts',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'journeys', 'influencers', 'voc', 'bi',
   ],
   logistics: [
-    'contact_logs', 'quotes', 'receivables',
+    'contact_logs', 'quotes', 'receivables', 'accounts',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'settlements', 'lot_management', 'ai_forecast', 'bi',
   ],
   food: [
-    'contact_logs', 'quotes', 'receivables',
+    'contact_logs', 'quotes', 'receivables', 'accounts',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'lot_management', 'voc', 'bi',
   ],
   general: [
-    'contact_logs', 'quotes', 'receivables',
+    'contact_logs', 'quotes', 'receivables', 'accounts',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'bi',
   ],
