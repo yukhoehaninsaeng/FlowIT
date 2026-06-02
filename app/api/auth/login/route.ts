@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const { email, password } = await req.json()
 
     const user = await prisma.user.findUnique({ where: { email } })
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || !user.passwordHash) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
-    const token = await signSession({ id: user.id, email: user.email, name: user.name, role: user.role })
+    const token = await signSession({ id: user.id, email: user.email, name: user.name ?? '', role: user.role })
 
     const cookieStore = await cookies()
     cookieStore.set('session', token, {
