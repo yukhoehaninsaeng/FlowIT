@@ -1,43 +1,23 @@
-import NextAuth from 'next-auth'
-import Credentials from 'next-auth/providers/credentials'
-import { compare } from 'bcryptjs'
+import { createClient } from '@/lib/supabase/server'
 import { prisma } from '@/lib/db'
-import { z } from 'zod'
-import { authConfig } from '@/lib/auth.config'
 
-const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8)
-})
+export async function auth() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user?.email) return null
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  ...authConfig,
-  providers: [
-    Credentials({
-      async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials)
-        if (!parsed.success) return null
+  const dbUser = await prisma.user.findUnique({
+    where: { email: user.email },
+    select: { id: true, email: true, name: true, role: true }
+  })
+  if (!dbUser) return null
 
-        const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email }
-        })
-        if (!user || !user.isActive) return null
-
-        const valid = await compare(parsed.data.password, user.passwordHash)
-        if (!valid) return null
-
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLoginAt: new Date() }
-        })
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        }
-      }
-    })
-  ]
-})
+  return {
+    user: {
+      id: dbUser.id,
+      email: dbUser.email,
+      name: dbUser.name,
+      role: dbUser.role as string
+    }
+  }
+}

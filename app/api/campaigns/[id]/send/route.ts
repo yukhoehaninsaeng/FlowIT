@@ -5,7 +5,7 @@ import { prisma } from '@/lib/db'
 import { UserRole } from '@prisma/client'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 export const POST = withAuditLog(
   withAuth(async (req, { params }) => {
@@ -31,7 +31,7 @@ export const POST = withAuditLog(
         const useA = !campaign.abEnabled || Math.random() * 100 < campaign.abRatioA
         const message = useA ? campaign.messageA : (campaign.messageB ?? campaign.messageA)
         try {
-          await resend.emails.send({
+          await getResend().emails.send({
             from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
             to: customer.email,
             subject: campaign.name,

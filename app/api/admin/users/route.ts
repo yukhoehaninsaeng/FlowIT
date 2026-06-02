@@ -7,7 +7,7 @@ import { UserRole } from '@prisma/client'
 import { randomBytes } from 'crypto'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 const inviteSchema = z.object({
   email: z.string().email(),
@@ -60,7 +60,7 @@ export const POST = withAuditLog(
     })
 
     const inviteUrl = `${process.env.AUTH_URL}/invite/${token}`
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
       to: body.data.email,
       subject: 'FlowIT CRM 초대',

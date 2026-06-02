@@ -1,36 +1,49 @@
-import NextAuth from 'next-auth'
-import { authConfig } from '@/lib/auth.config'
-import { NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
 
-// auth.config.ts만 import → pg/bcryptjs/prisma가 Edge Runtime에 포함되지 않음
-const { auth } = NextAuth(authConfig)
+export async function middleware(request: NextRequest) {
+  let supabaseResponse = NextResponse.next({ request })
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth
-  const pathname = req.nextUrl.pathname
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll() },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          supabaseResponse = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options)
+          )
+        }
+      }
+    }
+  )
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/invite')
   const isCronRoute = pathname.startsWith('/api/cron')
-  const isApiAuth = pathname.startsWith('/api/auth')
   const isWebhook = pathname.startsWith('/api/webhooks')
 
   if (isCronRoute) {
-    const secret = req.headers.get('authorization')
+    const secret = request.headers.get('authorization')
     if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     return NextResponse.next()
   }
 
-  if (isWebhook || isApiAuth) {
-    return NextResponse.next()
+  if (isWebhook) return supabaseResponse
+
+  if (!user && !isAuthPage) {
+    return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (!isLoggedIn && !isAuthPage) {
-    return NextResponse.redirect(new URL('/login', req.url))
-  }
-
-  return NextResponse.next()
-})
+  return supabaseResponse
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
