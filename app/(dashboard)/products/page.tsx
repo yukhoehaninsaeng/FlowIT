@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { formatKRW } from '@/lib/utils'
-import { Search, Plus, X, Loader2, Package, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, Plus, X, Loader2, Package, Link2, Trash2, ChevronDown, ChevronUp, Tag } from 'lucide-react'
 
 interface Product {
   id: string
@@ -32,19 +32,27 @@ const DEFAULT_FORM = {
 }
 
 const UNITS = ['개', '박스', 'kg', 'g', 'L', 'ml', '세트', '장', '롤', '팩', '병']
+const CAT_STORAGE_KEY = 'flowit_product_categories'
+
+function loadStoredCategories(): string[] {
+  if (typeof window === 'undefined') return []
+  try { return JSON.parse(localStorage.getItem(CAT_STORAGE_KEY) ?? '[]') } catch { return [] }
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [categories, setCategories] = useState<string[]>([])
+  const [storedCats, setStoredCats] = useState<string[]>([])
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [newCatInput, setNewCatInput] = useState('')
+  const [showCatInput, setShowCatInput] = useState(false)
 
   // 거래처 매핑 관련
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -55,6 +63,10 @@ export default function ProductsPage() {
   const [mapSaving, setMapSaving] = useState(false)
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    setStoredCats(loadStoredCategories())
+  }, [])
 
   const fetchProducts = useCallback(async (reset = false) => {
     setLoading(true)
@@ -68,15 +80,8 @@ export default function ProductsPage() {
     const data: Product[] = json.data ?? []
     if (reset) {
       setProducts(data)
-      const cats = Array.from(new Set(data.map(p => p.category))).sort()
-      setCategories(cats)
     } else {
-      setProducts(prev => {
-        const merged = [...prev, ...data]
-        const cats = Array.from(new Set(merged.map(p => p.category))).sort()
-        setCategories(cats)
-        return merged
-      })
+      setProducts(prev => [...prev, ...data])
     }
     setHasMore(json.meta?.hasMore ?? false)
     setCursor(json.meta?.nextCursor ?? null)
@@ -92,6 +97,31 @@ export default function ProductsPage() {
   useEffect(() => {
     fetch('/api/accounts').then(r => r.json()).then(d => setAccounts(d.accounts ?? []))
   }, [])
+
+  const productCats = Array.from(new Set(products.map(p => p.category))).sort()
+  const allCategories = Array.from(new Set([...storedCats, ...productCats])).sort()
+
+  function addCategory(cat: string) {
+    const trimmed = cat.trim()
+    if (!trimmed || storedCats.includes(trimmed)) return
+    const next = [...storedCats, trimmed].sort()
+    setStoredCats(next)
+    localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(next))
+  }
+
+  function removeCategory(cat: string) {
+    const next = storedCats.filter(c => c !== cat)
+    setStoredCats(next)
+    localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(next))
+  }
+
+  function handleAddCat() {
+    if (newCatInput.trim()) {
+      addCategory(newCatInput.trim())
+      setNewCatInput('')
+    }
+    setShowCatInput(false)
+  }
 
   async function handleCreate() {
     if (!form.skuCode.trim()) { setError('SKU 코드를 입력하세요.'); return }
@@ -113,6 +143,7 @@ export default function ProductsPage() {
         }),
       })
       if (!r.ok) { const d = await r.json(); setError(d.error ?? '등록 실패'); return }
+      addCategory(form.category)
       setShowForm(false); setForm(DEFAULT_FORM)
       setCursor(null); fetchProducts(true)
     } finally { setSaving(false) }
@@ -123,7 +154,6 @@ export default function ProductsPage() {
     setExpandedId(productId)
     if (mappings[productId]) return
     setLoadingMappings(productId)
-    // Fetch all account-products for this sku
     const r = await fetch(`/api/sku/${productId}/accounts`).catch(() => null)
     if (r && r.ok) {
       const d = await r.json()
@@ -163,8 +193,6 @@ export default function ProductsPage() {
     setMappings(prev => ({ ...prev, [productId]: prev[productId].filter(m => m.id !== mappingId) }))
   }
 
-  const categoryList = categories.length > 0 ? categories : Array.from(new Set(products.map(p => p.category))).sort()
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -178,6 +206,44 @@ export default function ProductsPage() {
         >
           <Plus size={14} /> 상품 등록
         </button>
+      </div>
+
+      {/* 카테고리 관리 칩 */}
+      <div className="bg-white rounded-lg border border-gray-200 px-4 py-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-xs font-medium text-gray-500 mr-1">
+            <Tag size={12} /> 카테고리
+          </span>
+          {allCategories.map(cat => (
+            <span key={cat} className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 text-xs rounded-full group">
+              {cat}
+              {storedCats.includes(cat) && !productCats.includes(cat) && (
+                <button onClick={() => removeCategory(cat)} className="text-gray-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X size={10} />
+                </button>
+              )}
+            </span>
+          ))}
+          {showCatInput ? (
+            <div className="flex items-center gap-1">
+              <input
+                autoFocus
+                value={newCatInput}
+                onChange={e => setNewCatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCat(); if (e.key === 'Escape') setShowCatInput(false) }}
+                placeholder="카테고리명"
+                className="w-28 px-2 py-1 text-xs border border-blue-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+              <button onClick={handleAddCat} className="px-2 py-1 bg-blue-600 text-white text-xs rounded-md hover:bg-blue-700">추가</button>
+              <button onClick={() => setShowCatInput(false)} className="text-gray-400 hover:text-gray-600"><X size={12} /></button>
+            </div>
+          ) : (
+            <button onClick={() => setShowCatInput(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 border border-dashed border-gray-300 text-gray-400 text-xs rounded-full hover:border-blue-400 hover:text-blue-500 transition-colors">
+              <Plus size={10} /> 추가
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 검색/필터 */}
@@ -195,7 +261,7 @@ export default function ProductsPage() {
           className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="">전체 카테고리</option>
-          {categoryList.map(c => <option key={c} value={c}>{c}</option>)}
+          {allCategories.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
@@ -220,14 +286,23 @@ export default function ProductsPage() {
                 placeholder="상품명을 입력하세요"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">카테고리 *</label>
+            <div className="col-span-3">
+              <label className="block text-xs text-gray-500 mb-1">카테고리 * — 클릭해서 선택하거나 직접 입력</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {allCategories.map(cat => (
+                  <button key={cat} type="button"
+                    onClick={() => setForm(p => ({ ...p, category: cat }))}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${form.category === cat ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-100 text-gray-600 border-gray-200 hover:border-blue-400 hover:text-blue-600'}`}>
+                    {cat}
+                  </button>
+                ))}
+              </div>
               <input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                placeholder="전자부품, 원자재..."
+                placeholder="또는 새 카테고리 직접 입력"
                 list="category-list"
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
               <datalist id="category-list">
-                {categoryList.map(c => <option key={c} value={c} />)}
+                {allCategories.map(c => <option key={c} value={c} />)}
               </datalist>
             </div>
             <div>
@@ -344,7 +419,7 @@ export default function ProductsPage() {
                                       <span className="text-blue-600 font-medium">{formatKRW(Number(m.customPrice))}</span>
                                     )}
                                     <button
-                                      onClick={() => removeMapping(product.id, m.id, /* accountId from mapping */ m.id)}
+                                      onClick={() => removeMapping(product.id, m.id, m.id)}
                                       className="ml-auto text-gray-300 hover:text-red-400"
                                     >
                                       <Trash2 size={12} />

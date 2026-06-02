@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Search, Plus, X, Loader2, Building2, Phone, Mail, FileText } from 'lucide-react'
+import { Search, Plus, X, Loader2, Building2, Phone, Mail, Pencil } from 'lucide-react'
 
 interface Account {
   id: string
@@ -11,8 +11,10 @@ interface Account {
   contactName: string | null
   contactPhone: string | null
   contactEmail: string | null
+  address: string | null
   emailDomain: string | null
   paymentTerms: string | null
+  notes: string | null
   createdAt: string
   _count: { deals: number; contactLogs: number; receivables: number }
 }
@@ -37,6 +39,7 @@ export default function AccountsPage() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
   const [form, setForm] = useState(DEFAULT_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -54,26 +57,49 @@ export default function AccountsPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function handleCreate() {
+  function openCreate() {
+    setEditId(null)
+    setForm(DEFAULT_FORM)
+    setError('')
+    setShowModal(true)
+  }
+
+  function openEdit(a: Account) {
+    setEditId(a.id)
+    setForm({
+      name: a.name,
+      type: a.type,
+      industry: a.industry ?? '',
+      contactName: a.contactName ?? '',
+      contactPhone: a.contactPhone ?? '',
+      contactEmail: a.contactEmail ?? '',
+      address: a.address ?? '',
+      paymentTerms: a.paymentTerms ?? '',
+      notes: a.notes ?? '',
+    })
+    setError('')
+    setShowModal(true)
+  }
+
+  async function handleSave() {
     if (!form.name.trim()) { setError('거래처명은 필수입니다.'); return }
     setSaving(true); setError('')
+    const body = {
+      ...form,
+      industry: form.industry || null,
+      contactName: form.contactName || null,
+      contactPhone: form.contactPhone || null,
+      contactEmail: form.contactEmail || null,
+      address: form.address || null,
+      paymentTerms: form.paymentTerms || null,
+      notes: form.notes || null,
+    }
     try {
-      const r = await fetch('/api/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          industry: form.industry || null,
-          contactName: form.contactName || null,
-          contactPhone: form.contactPhone || null,
-          contactEmail: form.contactEmail || null,
-          address: form.address || null,
-          paymentTerms: form.paymentTerms || null,
-          notes: form.notes || null,
-        }),
-      })
-      if (!r.ok) { const d = await r.json(); setError(d.error ?? '등록 실패'); return }
-      setShowModal(false); setForm(DEFAULT_FORM); load()
+      const r = editId
+        ? await fetch(`/api/accounts/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!r.ok) { const d = await r.json(); setError(d.error ?? '저장 실패'); return }
+      setShowModal(false); setForm(DEFAULT_FORM); setEditId(null); load()
     } finally { setSaving(false) }
   }
 
@@ -87,13 +113,12 @@ export default function AccountsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">거래처</h1>
-        <button onClick={() => { setShowModal(true); setError('') }}
+        <button onClick={openCreate}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
           <Plus size={14} /> 거래처 등록
         </button>
       </div>
 
-      {/* 검색/필터 */}
       <div className="flex gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -108,14 +133,13 @@ export default function AccountsPage() {
         </select>
       </div>
 
-      {/* 카드 그리드 */}
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 size={24} className="animate-spin text-gray-400" /></div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <Building2 size={40} className="mx-auto mb-3 text-gray-300" />
           <p className="text-sm text-gray-400">거래처가 없습니다</p>
-          <button onClick={() => setShowModal(true)}
+          <button onClick={openCreate}
             className="mt-3 text-sm text-blue-600 hover:text-blue-700">거래처 등록하기</button>
         </div>
       ) : (
@@ -127,9 +151,15 @@ export default function AccountsPage() {
                   <h3 className="text-sm font-semibold text-gray-900 truncate">{a.name}</h3>
                   {a.industry && <p className="text-xs text-gray-400 mt-0.5">{a.industry}</p>}
                 </div>
-                <span className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs rounded-full font-medium ${TYPE_COLOR[a.type] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {TYPE_LABEL[a.type] ?? a.type}
-                </span>
+                <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                  <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${TYPE_COLOR[a.type] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {TYPE_LABEL[a.type] ?? a.type}
+                  </span>
+                  <button onClick={() => openEdit(a)}
+                    className="p-1 text-gray-300 hover:text-blue-500 rounded transition-colors">
+                    <Pencil size={13} />
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -163,12 +193,11 @@ export default function AccountsPage() {
         </div>
       )}
 
-      {/* 등록 모달 */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-              <h2 className="text-sm font-semibold text-gray-900">거래처 등록</h2>
+              <h2 className="text-sm font-semibold text-gray-900">{editId ? '거래처 수정' : '거래처 등록'}</h2>
               <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
             <div className="px-6 py-5 space-y-4">
@@ -248,9 +277,9 @@ export default function AccountsPage() {
               </div>
             </div>
             <div className="flex gap-2 px-6 py-4 border-t border-gray-200 sticky bottom-0 bg-white">
-              <button onClick={handleCreate} disabled={saving}
+              <button onClick={handleSave} disabled={saving}
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50">
-                {saving && <Loader2 size={13} className="animate-spin" />} 등록
+                {saving && <Loader2 size={13} className="animate-spin" />} {editId ? '저장' : '등록'}
               </button>
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">취소</button>
             </div>

@@ -8,7 +8,7 @@ import { useUser } from '@/lib/hooks/useUser'
 import { useModules } from '@/lib/hooks/useModules'
 import { MODULE_REGISTRY, CATEGORY_LABELS, type ModuleCategory } from '@/lib/modules/registry'
 
-const CATEGORY_ORDER: ModuleCategory[] = ['core', 'sales', 'marketing', 'logistics', 'analytics']
+const CATEGORY_ORDER: ModuleCategory[] = ['core', 'master', 'sales', 'marketing', 'logistics', 'analytics']
 
 const adminItems = [
   { href: '/admin/modules', label: '모듈 관리', icon: Settings },

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-export type ModuleCategory = 'core' | 'marketing' | 'logistics' | 'analytics' | 'sales'
+export type ModuleCategory = 'core' | 'marketing' | 'logistics' | 'analytics' | 'sales' | 'master'
 
 export interface ModuleDef {
   key: string
@@ -52,7 +52,7 @@ export const MODULE_REGISTRY: ModuleDef[] = [
     label: '거래처',
     href: '/accounts',
     icon: Building2,
-    category: 'sales',
+    category: 'master',
     description: '거래처 정보, 담당자, 딜·상담·미수금 연결 관리',
     defaultEnabled: true,
   },
@@ -61,7 +61,7 @@ export const MODULE_REGISTRY: ModuleDef[] = [
     label: '상품 관리',
     href: '/products',
     icon: Package,
-    category: 'sales',
+    category: 'master',
     description: '상품 카탈로그, 단가 관리, 거래처별 제품 매핑',
     defaultEnabled: true,
   },
@@ -241,6 +241,7 @@ export const INDUSTRY_PRESETS: Record<string, string[]> = {
 }
 
 export const CATEGORY_LABELS: Record<ModuleCategory, string> = {
+  master: '마스터 데이터',
   sales: '영업·거래',
   core: '핵심',
   marketing: '마케팅',
