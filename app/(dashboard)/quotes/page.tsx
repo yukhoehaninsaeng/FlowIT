@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import { Plus, Download, Copy, Send, CheckCircle, XCircle, Clock, FileText, Loader2, Search } from 'lucide-react'
 
 interface QuoteItem {
@@ -187,10 +186,7 @@ export default function QuotesPage() {
   const filtered = quotes.filter(q => !statusFilter || q.status === statusFilter)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="견적 관리" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6">
+    <>
 
           {/* Stats */}
           <div className="grid grid-cols-5 gap-3 mb-6">
@@ -381,7 +377,7 @@ export default function QuotesPage() {
           )}
 
           {/* Quote List */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -465,8 +461,6 @@ export default function QuotesPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </main>
-    </div>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import { BrainCircuit, TrendingUp, TrendingDown, Minus, RefreshCw, Loader2 } from 'lucide-react'
 
 interface Forecast {
@@ -54,10 +53,7 @@ export default function ForecastPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="AI 수요예측" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6">
+    <>
 
           {/* Header */}
           <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 mb-6 text-white">
@@ -182,8 +178,6 @@ export default function ForecastPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </main>
-    </div>
+    </>
   )
 }

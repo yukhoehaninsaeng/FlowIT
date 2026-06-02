@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import {
   Mail, Phone, MapPin, MessageSquare, Video, Plus,
   RefreshCw, Loader2, AlertCircle, Link2, ChevronDown
@@ -98,10 +97,7 @@ export default function ContactLogsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="상담 이력" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6 max-w-5xl">
+    <>
 
           {/* Header actions */}
           <div className="flex items-center justify-between mb-6">
@@ -198,9 +194,7 @@ export default function ContactLogsPage() {
           ) : (
             <UnmatchedView logs={unmatched} accounts={accounts} onAssign={assignUnmatched} />
           )}
-        </div>
-      </main>
-    </div>
+    </>
   )
 }
 

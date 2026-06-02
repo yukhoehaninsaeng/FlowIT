@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import { Plus, AlertTriangle, DollarSign, Clock, CheckCircle, Loader2 } from 'lucide-react'
 
 interface Payment {
@@ -119,10 +118,7 @@ export default function ReceivablesPage() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="미수금 관리" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6">
+    <>
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
@@ -267,7 +263,7 @@ export default function ReceivablesPage() {
           )}
 
           {/* Table */}
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
@@ -346,8 +342,6 @@ export default function ReceivablesPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </main>
-    </div>
+    </>
   )
 }

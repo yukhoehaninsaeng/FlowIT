@@ -102,7 +102,7 @@ export default function ReturnsPage() {
         </select>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">반품번호</th>

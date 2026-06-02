@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import { MODULE_REGISTRY, CATEGORY_LABELS, INDUSTRY_PRESETS, type ModuleCategory } from '@/lib/modules/registry'
 import { ToggleLeft, ToggleRight, Loader2, CheckCircle, RefreshCw, AlertTriangle, Info } from 'lucide-react'
 
@@ -109,10 +108,7 @@ export default function ModulesPage() {
   const categories = Array.from(new Set(MODULE_REGISTRY.map(m => m.category))) as ModuleCategory[]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="모듈 관리" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6 max-w-4xl">
+    <>
 
           {/* DB 미준비 경고 */}
           {!dbReady && (
@@ -240,8 +236,6 @@ export default function ModulesPage() {
             </button>
           </div>
 
-        </div>
-      </main>
-    </div>
+    </>
   )
 }

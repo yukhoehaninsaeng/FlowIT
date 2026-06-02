@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Topbar } from '@/components/layout/Topbar'
 import { Search, AlertTriangle, CheckCircle, Clock, Package } from 'lucide-react'
 
 interface LotItem {
@@ -40,10 +39,7 @@ export default function LotManagementPage() {
   const ok = lots.filter(l => l.status === 'ok').length
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Topbar title="LOT 관리" />
-      <main className="pt-14 pl-[220px]">
-        <div className="p-6">
+    <>
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
@@ -153,8 +149,6 @@ export default function LotManagementPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </main>
-    </div>
+    </>
   )
 }
