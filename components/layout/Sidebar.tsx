@@ -3,33 +3,22 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard, Users, TrendingUp, Package, Megaphone,
-  GitBranch, Star, MessageSquare, BarChart3, Settings
-} from 'lucide-react'
+import { Settings, Loader2 } from 'lucide-react'
 import { useUser } from '@/lib/hooks/useUser'
-
-const navItems = [
-  { href: '/', label: '대시보드', icon: LayoutDashboard },
-  { href: '/customers', label: '고객', icon: Users },
-  { href: '/sales', label: '영업 파이프라인', icon: TrendingUp },
-  { href: '/inventory', label: '재고·SKU', icon: Package },
-  { href: '/campaigns', label: '캠페인', icon: Megaphone },
-  { href: '/journeys', label: '여정 자동화', icon: GitBranch },
-  { href: '/influencers', label: '인플루언서', icon: Star },
-  { href: '/voc', label: 'VOC·리뷰', icon: MessageSquare },
-  { href: '/bi', label: 'BI 대시보드', icon: BarChart3 }
-]
+import { useModules } from '@/lib/hooks/useModules'
+import { MODULE_REGISTRY } from '@/lib/modules/registry'
 
 const adminItems = [
+  { href: '/admin/modules', label: '모듈 관리', icon: Settings },
   { href: '/admin/users', label: '계정 관리', icon: Settings },
   { href: '/admin/api-connections', label: 'API 연결', icon: Settings },
-  { href: '/admin/audit-logs', label: '감사 로그', icon: Settings }
+  { href: '/admin/audit-logs', label: '감사 로그', icon: Settings },
 ]
 
 export function Sidebar() {
   const pathname = usePathname()
   const { user } = useUser()
+  const { modules, loading } = useModules()
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
 
   return (
@@ -40,21 +29,31 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-        {navItems.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
-              pathname === href
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            )}
-          >
-            <Icon size={16} />
-            {label}
-          </Link>
-        ))}
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={16} className="animate-spin text-gray-500" />
+          </div>
+        ) : (
+          modules.map(({ key, href, label }) => {
+            const def = MODULE_REGISTRY.find(m => m.key === key)
+            const Icon = def?.icon
+            return (
+              <Link
+                key={key}
+                href={href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors',
+                  pathname === href || (href !== '/' && pathname.startsWith(href))
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                )}
+              >
+                {Icon && <Icon size={16} />}
+                {label}
+              </Link>
+            )
+          })
+        )}
 
         {isAdmin && (
           <>

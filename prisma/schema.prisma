@@ -451,6 +451,243 @@ model Deal {
 }
 
 // ─────────────────────────────────────────
+// 워크스페이스 (멀티테넌트)
+// ─────────────────────────────────────────
+
+model Workspace {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String   @unique
+  industry  String   @default("general")
+  plan      String   @default("starter")
+  settings  Json?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  modules WorkspaceModule[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceModule {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  moduleKey    String    @map("module_key")
+  isEnabled    Boolean   @default(false) @map("is_enabled")
+  config       Json?
+  displayOrder Int       @default(0) @map("display_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([workspaceId, moduleKey])
+  @@index([workspaceId])
+  @@map("workspace_modules")
+}
+
+// ─────────────────────────────────────────
+// 물류 — 발주·수주
+// ─────────────────────────────────────────
+
+model PurchaseOrder {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNo     String              @unique @map("order_no")
+  type        String              // 'purchase' | 'sales'
+  partnerId   String?             @map("partner_id") @db.Uuid
+  partnerName String?             @map("partner_name")
+  status      String              @default("draft")
+  totalAmount Decimal?            @map("total_amount") @db.Decimal(15, 2)
+  notes       String?
+  dueDate     DateTime?           @map("due_date")
+  issuedAt    DateTime?           @map("issued_at")
+  createdById String?             @map("created_by") @db.Uuid
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  items PurchaseOrderItem[]
+
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId         String        @map("order_id") @db.Uuid
+  order           PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  skuMasterId     String?       @map("sku_master_id") @db.Uuid
+  skuCode         String?       @map("sku_code")
+  skuName         String?       @map("sku_name")
+  qty             Int
+  unitPrice       Decimal       @map("unit_price") @db.Decimal(15, 2)
+  lotNumber       String?       @map("lot_number")
+
+  @@index([orderId])
+  @@map("purchase_order_items")
+}
+
+// ─────────────────────────────────────────
+// 물류 — 창고·입출고
+// ─────────────────────────────────────────
+
+model WarehouseLocation {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String   @unique
+  name      String
+  zone      String?
+  capacity  Int?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  movements StockMovement[]
+
+  @@map("warehouse_locations")
+}
+
+model StockMovement {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type          String             // 'inbound' | 'outbound' | 'transfer' | 'return' | 'adjust'
+  skuMasterId   String?            @map("sku_master_id") @db.Uuid
+  skuCode       String?            @map("sku_code")
+  skuName       String?            @map("sku_name")
+  locationId    String?            @map("location_id") @db.Uuid
+  location      WarehouseLocation? @relation(fields: [locationId], references: [id])
+  qty           Int
+  lotNumber     String?            @map("lot_number")
+  lotExpiry     DateTime?          @map("lot_expiry")
+  referenceType String?            @map("reference_type")
+  referenceId   String?            @map("reference_id") @db.Uuid
+  notes         String?
+  createdById   String?            @map("created_by") @db.Uuid
+  createdAt     DateTime           @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([skuMasterId])
+  @@index([locationId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// ─────────────────────────────────────────
+// 물류 — 배송 추적
+// ─────────────────────────────────────────
+
+model Shipment {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trackingNo       String?   @map("tracking_no")
+  carrier          String?
+  status           String    @default("preparing") // preparing | shipped | in_transit | delivered | failed
+  customerId       String?   @map("customer_id") @db.Uuid
+  orderId          String?   @map("order_id") @db.Uuid
+  recipientName    String?   @map("recipient_name")
+  recipientPhone   String?   @map("recipient_phone")
+  recipientAddress String?   @map("recipient_address")
+  weight           Decimal?  @db.Decimal(8, 2)
+  boxCount         Int?      @map("box_count")
+  shippedAt        DateTime? @map("shipped_at")
+  deliveredAt      DateTime? @map("delivered_at")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@index([trackingNo])
+  @@index([status])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("shipments")
+}
+
+// ─────────────────────────────────────────
+// 물류 — 반품 관리
+// ─────────────────────────────────────────
+
+model Return {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  returnNo     String    @unique @map("return_no")
+  customerId   String?   @map("customer_id") @db.Uuid
+  orderId      String?   @map("order_id") @db.Uuid
+  trackingNo   String?   @map("tracking_no")
+  reason       String?
+  status       String    @default("requested") // requested | received | inspecting | restocked | refunded | rejected
+  refundAmount Decimal?  @map("refund_amount") @db.Decimal(15, 2)
+  notes        String?
+  receivedAt   DateTime? @map("received_at")
+  resolvedAt   DateTime? @map("resolved_at")
+  createdById  String?   @map("created_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  items ReturnItem[]
+
+  @@index([status])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("returns")
+}
+
+model ReturnItem {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  returnId    String  @map("return_id") @db.Uuid
+  return      Return  @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  skuMasterId String? @map("sku_master_id") @db.Uuid
+  skuCode     String? @map("sku_code")
+  skuName     String? @map("sku_name")
+  qty         Int
+  condition   String? // 'good' | 'damaged' | 'expired'
+  lotNumber   String? @map("lot_number")
+
+  @@index([returnId])
+  @@map("return_items")
+}
+
+// ─────────────────────────────────────────
+// 물류 — 거래처 정산
+// ─────────────────────────────────────────
+
+model Settlement {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  partnerId   String?   @map("partner_id") @db.Uuid
+  partnerName String?   @map("partner_name")
+  period      String    // '2024-01'
+  totalAmount Decimal   @map("total_amount") @db.Decimal(15, 2)
+  status      String    @default("draft") // draft | confirmed | paid
+  dueDate     DateTime? @map("due_date")
+  paidAt      DateTime? @map("paid_at")
+  notes       String?
+  createdById String?   @map("created_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([partnerId])
+  @@index([period])
+  @@index([status])
+  @@map("settlements")
+}
+
+// ─────────────────────────────────────────
+// 물류 — AI 수요예측
+// ─────────────────────────────────────────
+
+model DemandForecast {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  skuMasterId   String   @map("sku_master_id") @db.Uuid
+  skuCode       String   @map("sku_code")
+  skuName       String   @map("sku_name")
+  forecastDate  DateTime @map("forecast_date")
+  forecastQty   Int      @map("forecast_qty")
+  actualQty     Int?     @map("actual_qty")
+  confidence    Decimal? @db.Decimal(4, 3)
+  modelVersion  String?  @map("model_version")
+  factors       Json?
+  computedAt    DateTime @default(now()) @map("computed_at")
+
+  @@index([skuMasterId])
+  @@index([forecastDate])
+  @@map("demand_forecasts")
+}
+
+// ─────────────────────────────────────────
 // 관리자
 // ─────────────────────────────────────────
 
