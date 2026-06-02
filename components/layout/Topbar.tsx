@@ -1,16 +1,23 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
 import { Bell, LogOut, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useUser } from '@/lib/hooks/useUser'
 
 interface TopbarProps {
   title: string
 }
 
 export function Topbar({ title }: TopbarProps) {
-  const { data: session } = useSession()
+  const { user } = useUser()
+  const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+
+  async function handleLogout() {
+    await fetch('/api/auth/logout', { method: 'POST' })
+    router.push('/login')
+  }
 
   return (
     <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 fixed top-0 left-[220px] right-0 z-20">
@@ -27,19 +34,19 @@ export function Topbar({ title }: TopbarProps) {
             className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
           >
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-medium">
-              {session?.user?.name?.charAt(0) ?? 'U'}
+              {user?.name?.charAt(0) ?? 'U'}
             </div>
-            <span className="hidden sm:block">{session?.user?.name}</span>
+            <span className="hidden sm:block">{user?.name}</span>
             <ChevronDown size={14} />
           </button>
 
           {menuOpen && (
             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50">
               <div className="px-4 py-2 text-xs text-gray-500 border-b">
-                {session?.user?.email}
+                {user?.email}
               </div>
               <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
+                onClick={handleLogout}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
                 <LogOut size={14} />

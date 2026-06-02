@@ -6,10 +6,6 @@ import { cookies } from 'next/headers'
 
 export async function POST(req: NextRequest) {
   try {
-    const dbUrl = process.env.DATABASE_URL ?? 'NOT SET'
-    const dbHost = dbUrl.replace(/:\/\/[^@]+@/, '://***@').split('?')[0]
-    console.log('DB_URL_IN_USE:', dbHost)
-
     const { email, password } = await req.json()
 
     const user = await prisma.user.findUnique({ where: { email } })
@@ -37,14 +33,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true })
   } catch (e) {
-    // 임시 디버깅: 실제 에러를 브라우저에서 바로 확인하기 위함
-    const err = e as Error
-    console.error('LOGIN_ERROR', err)
-    const dbUrl = process.env.DATABASE_URL ?? 'NOT SET'
-    const dbHost = dbUrl.replace(/:\/\/[^@]+@/, '://***@').split('?')[0]
-    return NextResponse.json(
-      { error: 'debug', name: err.name, message: err.message, db: dbHost },
-      { status: 500 }
-    )
+    console.error('LOGIN_ERROR', e)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

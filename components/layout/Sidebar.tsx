@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, TrendingUp, Package, Megaphone,
   GitBranch, Star, MessageSquare, BarChart3, Settings
 } from 'lucide-react'
-import { useSession } from 'next-auth/react'
+import { useUser } from '@/lib/hooks/useUser'
 
 const navItems = [
   { href: '/', label: '대시보드', icon: LayoutDashboard },
@@ -29,8 +29,8 @@ const adminItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { data: session } = useSession()
-  const isAdmin = session?.user?.role === 'ADMIN' || session?.user?.role === 'SUPER_ADMIN'
+  const { user } = useUser()
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-[220px] bg-gray-900 text-white flex flex-col z-30">
