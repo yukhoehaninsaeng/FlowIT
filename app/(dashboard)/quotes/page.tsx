@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Topbar } from '@/components/layout/Topbar'
-import { Plus, Download, Copy, Send, CheckCircle, XCircle, Clock, FileText, Loader2 } from 'lucide-react'
+import { Plus, Download, Copy, Send, CheckCircle, XCircle, Clock, FileText, Loader2, Search } from 'lucide-react'
 
 interface QuoteItem {
   name: string
@@ -10,6 +10,15 @@ interface QuoteItem {
   unitPrice: number
   discount?: number
   total: number
+}
+
+interface ProductSuggestion {
+  id: string
+  skuCode: string
+  name: string
+  unit: string | null
+  sellingPrice: string | null
+  category: string
 }
 
 interface Quote {
@@ -60,6 +69,38 @@ export default function QuotesPage() {
   const [saving, setSaving] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const [generatingPdf, setGeneratingPdf] = useState<string | null>(null)
+
+  // 상품 검색
+  const [productSearch, setProductSearch] = useState<Record<number, string>>({})
+  const [productSuggestions, setProductSuggestions] = useState<Record<number, ProductSuggestion[]>>({})
+  const [showSuggestions, setShowSuggestions] = useState<Record<number, boolean>>({})
+  const searchTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  async function searchProducts(idx: number, query: string) {
+    setProductSearch(prev => ({ ...prev, [idx]: query }))
+    if (searchTimers.current[idx]) clearTimeout(searchTimers.current[idx])
+    if (!query.trim()) { setProductSuggestions(prev => ({ ...prev, [idx]: [] })); return }
+    searchTimers.current[idx] = setTimeout(async () => {
+      const r = await fetch(`/api/sku?search=${encodeURIComponent(query)}&limit=8`)
+      const d = await r.json()
+      setProductSuggestions(prev => ({ ...prev, [idx]: d.data ?? [] }))
+      setShowSuggestions(prev => ({ ...prev, [idx]: true }))
+    }, 250)
+  }
+
+  function selectProduct(idx: number, product: ProductSuggestion) {
+    const unitPrice = product.sellingPrice ? Number(product.sellingPrice) : 0
+    setForm(prev => {
+      const items = [...prev.items]
+      const item = { ...items[idx], name: product.name, unitPrice }
+      const base = item.qty * item.unitPrice
+      item.total = item.discount ? base * (1 - item.discount / 100) : base
+      items[idx] = item
+      return { ...prev, items }
+    })
+    setProductSearch(prev => ({ ...prev, [idx]: '' }))
+    setShowSuggestions(prev => ({ ...prev, [idx]: false }))
+  }
 
   const load = useCallback(async () => {
     const [qr, ar] = await Promise.all([
@@ -227,9 +268,46 @@ export default function QuotesPage() {
                       {form.items.map((item, idx) => (
                         <tr key={idx}>
                           <td className="px-2 py-1.5">
-                            <input value={item.name} onChange={e => recalcItem(idx, 'name', e.target.value)}
-                              placeholder="품목명"
-                              className="w-full px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs" />
+                            <div className="relative">
+                              <div className="flex gap-1">
+                                <input value={item.name} onChange={e => recalcItem(idx, 'name', e.target.value)}
+                                  placeholder="품목명"
+                                  className="flex-1 px-2 py-1 border border-gray-200 rounded-l focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs" />
+                                <div className="relative">
+                                  <input
+                                    value={productSearch[idx] ?? ''}
+                                    onChange={e => searchProducts(idx, e.target.value)}
+                                    onFocus={() => setShowSuggestions(prev => ({ ...prev, [idx]: !!(productSuggestions[idx]?.length) }))}
+                                    onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [idx]: false })), 200)}
+                                    placeholder="상품 검색"
+                                    className="w-24 px-2 py-1 border border-l-0 border-gray-200 rounded-r focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs text-gray-500"
+                                  />
+                                  <Search size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-300 pointer-events-none" />
+                                </div>
+                              </div>
+                              {showSuggestions[idx] && (productSuggestions[idx] ?? []).length > 0 && (
+                                <div className="absolute top-full left-0 right-0 z-50 bg-white border border-gray-200 rounded-md shadow-lg mt-0.5 overflow-hidden">
+                                  {productSuggestions[idx].map(p => (
+                                    <button
+                                      key={p.id}
+                                      onMouseDown={() => selectProduct(idx, p)}
+                                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-blue-50 text-left"
+                                    >
+                                      <div>
+                                        <span className="text-xs font-medium text-gray-900">{p.name}</span>
+                                        <span className="text-xs text-gray-400 ml-1.5">{p.skuCode}</span>
+                                      </div>
+                                      <div className="text-right">
+                                        <span className="text-xs text-blue-600 font-medium">
+                                          {p.sellingPrice ? `₩${Number(p.sellingPrice).toLocaleString()}` : '단가 없음'}
+                                        </span>
+                                        {p.unit && <span className="text-xs text-gray-400 ml-1">/{p.unit}</span>}
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="px-2 py-1.5">
                             <input type="number" value={item.qty} min={1}

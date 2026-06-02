@@ -56,6 +56,15 @@ export const MODULE_REGISTRY: ModuleDef[] = [
     description: '거래처 정보, 담당자, 딜·상담·미수금 연결 관리',
     defaultEnabled: true,
   },
+  {
+    key: 'products',
+    label: '상품 관리',
+    href: '/products',
+    icon: Package,
+    category: 'sales',
+    description: '상품 카탈로그, 단가 관리, 거래처별 제품 매핑',
+    defaultEnabled: true,
+  },
   // ── core ───────────────────────────────────
   {
     key: 'dashboard',
@@ -208,24 +217,24 @@ export const MODULE_REGISTRY: ModuleDef[] = [
 
 export const INDUSTRY_PRESETS: Record<string, string[]> = {
   cosmetics: [
-    'contact_logs', 'quotes', 'receivables', 'accounts',
+    'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'journeys', 'influencers', 'voc', 'bi',
   ],
   logistics: [
-    'contact_logs', 'quotes', 'receivables', 'accounts',
+    'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'settlements', 'lot_management', 'ai_forecast', 'bi',
   ],
   food: [
-    'contact_logs', 'quotes', 'receivables', 'accounts',
+    'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
     'lot_management', 'voc', 'bi',
   ],
   general: [
-    'contact_logs', 'quotes', 'receivables', 'accounts',
+    'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'campaigns', 'bi',
   ],

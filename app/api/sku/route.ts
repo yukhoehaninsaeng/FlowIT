@@ -10,9 +10,10 @@ const createSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
   subCategory: z.string().optional(),
+  unit: z.string().optional(),
   ingredients: z.array(z.string()).default([]),
-  unitCost: z.number().int().positive(),
-  sellingPrice: z.number().int().positive(),
+  unitCost: z.number().nonnegative().optional(),
+  sellingPrice: z.number().nonnegative().optional(),
   lotExpiry: z.string().datetime().optional(),
   isBundle: z.boolean().default(false)
 })

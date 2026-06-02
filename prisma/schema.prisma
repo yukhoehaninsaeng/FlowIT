@@ -162,12 +162,15 @@ model SkuMaster {
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
 
-  aliases     SkuAlias[]
-  bundleItems SkuBundle[] @relation("BundleSku")
-  components  SkuBundle[] @relation("ComponentSku")
-  inventory   Inventory[]
-  orderItems  OrderItem[]
-  vocReviews  VocReview[]
+  unit         String?   // 개, 박스, kg, L, 세트 등
+
+  aliases         SkuAlias[]
+  bundleItems     SkuBundle[] @relation("BundleSku")
+  components      SkuBundle[] @relation("ComponentSku")
+  inventory       Inventory[]
+  orderItems      OrderItem[]
+  vocReviews      VocReview[]
+  accountProducts AccountProduct[]
 
   @@index([skuCode])
   @@index([category])
@@ -430,13 +433,31 @@ model Account {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  deals          Deal[]
-  contactLogs    ContactLog[]
-  quotes         Quote[]
-  receivables    Receivable[]
+  deals           Deal[]
+  contactLogs     ContactLog[]
+  quotes          Quote[]
+  receivables     Receivable[]
+  accountProducts AccountProduct[]
 
   @@index([emailDomain])
   @@map("accounts")
+}
+
+model AccountProduct {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  accountId   String    @map("account_id") @db.Uuid
+  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  skuMasterId String    @map("sku_master_id") @db.Uuid
+  skuMaster   SkuMaster @relation(fields: [skuMasterId], references: [id], onDelete: Cascade)
+  type        String    @default("sell") // sell | buy
+  customPrice Decimal?  @map("custom_price") @db.Decimal(15, 2)
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@unique([accountId, skuMasterId, type])
+  @@index([accountId])
+  @@index([skuMasterId])
+  @@map("account_products")
 }
 
 model Deal {
