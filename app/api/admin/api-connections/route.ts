@@ -3,12 +3,12 @@ import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole, Channel } from '@prisma/client'
+
 import { encrypt } from '@/lib/crypto'
 
 const createSchema = z.object({
   name: z.string().min(1),
-  channel: z.nativeEnum(Channel),
+  channel: z.string(),
   endpoint: z.string().url(),
   authType: z.enum(['api_key', 'oauth2', 'basic']),
   token: z.string().optional(),
@@ -26,7 +26,7 @@ export const GET = withAuth(async () => {
     }
   })
   return NextResponse.json({ data: items })
-}, [UserRole.SUPER_ADMIN, UserRole.ADMIN])
+}, ['super_admin', 'admin'])
 
 export const POST = withAuditLog(
   withAuth(async (req) => {
@@ -44,6 +44,6 @@ export const POST = withAuditLog(
       }
     })
     return NextResponse.json({ data: { ...conn, tokenEncrypted: undefined, refreshToken: undefined } }, { status: 201 })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN]),
+  }, ['super_admin', 'admin']),
   { action: 'CREATE', resource: 'api_connection' }
 )

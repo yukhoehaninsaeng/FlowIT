@@ -3,10 +3,10 @@ import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 
 const updateSchema = z.object({
-  role: z.nativeEnum(UserRole).optional(),
+  role: z.enum(['super_admin', 'admin', 'manager', 'member', 'viewer']).optional(),
   groupId: z.string().nullable().optional(),
   isActive: z.boolean().optional()
 })
@@ -23,7 +23,7 @@ export const PATCH = withAuditLog(
       select: { id: true, email: true, name: true, role: true, isActive: true }
     })
     return NextResponse.json({ data: user })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN]),
+  }, ['super_admin', 'admin']),
   { action: 'UPDATE', resource: 'user', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-1) }
 )
 
@@ -34,6 +34,6 @@ export const DELETE = withAuditLog(
     }
     await prisma.user.delete({ where: { id: params?.id } })
     return NextResponse.json({ data: { deleted: true } })
-  }, [UserRole.SUPER_ADMIN]),
+  }, ['super_admin']),
   { action: 'DELETE', resource: 'user', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-1) }
 )

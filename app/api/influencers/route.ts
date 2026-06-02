@@ -3,11 +3,11 @@ import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { Channel } from '@prisma/client'
+
 
 const createSchema = z.object({
   name: z.string().min(1),
-  channel: z.nativeEnum(Channel),
+  channel: z.string(),
   handle: z.string().min(1),
   followerCnt: z.number().int().default(0),
   avgEngagement: z.number().default(0),

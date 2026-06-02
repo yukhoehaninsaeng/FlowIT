@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { prisma } from '@/lib/db'
-import { UserRole } from '@prisma/client'
+
 
 export const POST = withAuth(async (req, { params }) => {
   const conn = await prisma.apiConnection.findUnique({ where: { id: params?.id } })
@@ -34,4 +34,4 @@ export const POST = withAuth(async (req, { params }) => {
     })
     return NextResponse.json({ data: { status: 'error', error: String(err) } })
   }
-}, [UserRole.SUPER_ADMIN, UserRole.ADMIN])
+}, ['super_admin', 'admin'])

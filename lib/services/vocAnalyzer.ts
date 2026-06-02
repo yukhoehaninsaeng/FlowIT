@@ -18,7 +18,7 @@ export async function runVocAnalysis() {
 
   for (const review of reviews) {
     try {
-      const result = await analyzeReview(review.content)
+      const result = await analyzeReview(review.content ?? '')
       await prisma.vocReview.update({
         where: { id: review.id },
         data: { sentiment: result.sentiment, tags: result.tags, analyzedAt: new Date() }

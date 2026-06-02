@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { prisma } from '@/lib/db'
-import { OrderStatus } from '@prisma/client'
 
-const PAID: OrderStatus[] = ['PAID', 'SHIPPED', 'DELIVERED']
+
+const PAID = ['PAID', 'SHIPPED', 'DELIVERED']
 
 export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl

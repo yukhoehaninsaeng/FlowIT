@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 import { encrypt } from '@/lib/crypto'
 
 const updateSchema = z.object({
@@ -29,7 +29,7 @@ export const PATCH = withAuditLog(
       }
     })
     return NextResponse.json({ data: { ...conn, tokenEncrypted: undefined, refreshToken: undefined } })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN]),
+  }, ['super_admin', 'admin']),
   { action: 'UPDATE', resource: 'api_connection', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-1) }
 )
 
@@ -37,6 +37,6 @@ export const DELETE = withAuditLog(
   withAuth(async (req, { params }) => {
     await prisma.apiConnection.delete({ where: { id: params?.id } })
     return NextResponse.json({ data: { deleted: true } })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN]),
+  }, ['super_admin', 'admin']),
   { action: 'DELETE', resource: 'api_connection', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-1) }
 )

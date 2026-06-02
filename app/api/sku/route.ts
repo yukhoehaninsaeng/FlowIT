@@ -3,7 +3,7 @@ import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 
 const createSchema = z.object({
   skuCode: z.string().min(1),
@@ -63,6 +63,6 @@ export const POST = withAuditLog(
       }
     })
     return NextResponse.json({ data: sku }, { status: 201 })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]),
+  }, ['super_admin', 'admin', 'manager']),
   { action: 'CREATE', resource: 'sku' }
 )

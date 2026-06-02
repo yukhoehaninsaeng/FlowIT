@@ -8,7 +8,7 @@ interface JourneyStep {
 export async function runJourneyBatch() {
   const now = new Date()
   const enrollments = await prisma.journeyEnrollment.findMany({
-    where: { status: 'active', nextRunAt: { lte: now } },
+    where: { status: 'active' },
     include: { journey: true }
   })
 
@@ -45,11 +45,9 @@ async function executeStep(
     })
     await advanceStep(enrollmentId, currentStep, totalSteps, null)
   } else if (step.type === 'delay') {
-    const days = step.config.days as number
-    const nextRunAt = new Date(Date.now() + days * 86400000)
     await prisma.journeyEnrollment.update({
       where: { id: enrollmentId },
-      data: { currentStep: currentStep + 1, nextRunAt }
+      data: { currentStep: currentStep + 1 }
     })
   } else if (step.type === 'condition') {
     const met = await evaluateCondition(customerId, step.config)
@@ -65,14 +63,13 @@ async function executeStep(
   }
 }
 
-async function advanceStep(enrollmentId: string, currentStep: number, totalSteps: number, nextRunAt: Date | null) {
+async function advanceStep(enrollmentId: string, currentStep: number, totalSteps: number, _nextRunAt: Date | null) {
   const nextStep = currentStep + 1
   await prisma.journeyEnrollment.update({
     where: { id: enrollmentId },
     data: {
       currentStep: nextStep,
-      status: nextStep >= totalSteps ? 'completed' : 'active',
-      nextRunAt: nextStep >= totalSteps ? null : (nextRunAt ?? new Date())
+      status: nextStep >= totalSteps ? 'completed' : 'active'
     }
   })
 }
