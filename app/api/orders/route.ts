@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { prisma } from '@/lib/db'
-import { Channel, OrderStatus } from '@prisma/client'
+
 
 export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl
   const cursor = searchParams.get('cursor') ?? undefined
   const limit = Math.min(Number(searchParams.get('limit') ?? 20), 100)
-  const channel = searchParams.get('channel') as Channel | null
-  const status = searchParams.get('status') as OrderStatus | null
+  const channel = searchParams.get('channel')
+  const status = searchParams.get('status')
   const startDate = searchParams.get('startDate')
   const endDate = searchParams.get('endDate')
 

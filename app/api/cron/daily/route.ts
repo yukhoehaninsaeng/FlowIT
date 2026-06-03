@@ -5,7 +5,7 @@ import { runJourneyBatch } from '@/lib/services/journeyEngine'
 import { prisma } from '@/lib/db'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 // Vercel Hobby: 단일 일간 Cron (KST 03:00 = UTC 18:00 전일)
 // Pro 플랜으로 업그레이드 시 vercel.json을 복수 Cron으로 분리한다.
@@ -84,7 +84,7 @@ async function runLotExpiryCheck() {
   })
 
   for (const admin of admins) {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
       to: admin.email,
       subject: `[FlowIT] 유통기한 임박 SKU ${expiringSkus.length}건`,

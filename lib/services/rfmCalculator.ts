@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
-import { OrderStatus } from '@prisma/client'
 
-const PAID_STATUSES: OrderStatus[] = ['PAID', 'SHIPPED', 'DELIVERED']
+
+const PAID_STATUSES = ['PAID', 'SHIPPED', 'DELIVERED']
 const CHUNK_SIZE = 1000
 
 function calcR(daysSinceLastPurchase: number): number {

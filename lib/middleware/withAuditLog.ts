@@ -1,3 +1,4 @@
+import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -8,29 +9,31 @@ interface AuditOptions {
   getPayload?: (req: NextRequest) => Promise<{ before?: unknown; after?: unknown }>
 }
 
-export function withAuditLog(
-  handler: (req: NextRequest, ctx: { params?: Record<string, string>; session: { user: { id: string; role: string } } }) => Promise<NextResponse>,
-  opts: AuditOptions
-) {
-  return async (req: NextRequest, ctx: { params?: Record<string, string>; session: { user: { id: string; role: string } } }) => {
+type RouteHandler = (req: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<NextResponse>
+
+export function withAuditLog(handler: RouteHandler, opts: AuditOptions): RouteHandler {
+  return async (req, ctx) => {
     const response = await handler(req, ctx)
 
-    if (response.ok && ctx.session?.user) {
-      const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ?? 'unknown'
-      const payload = opts.getPayload ? await opts.getPayload(req) : {}
+    if (response.ok) {
+      const session = await auth()
+      if (session?.user) {
+        const ip = req.headers.get('x-forwarded-for')?.split(',')[0] ?? 'unknown'
+        const payload = opts.getPayload ? await opts.getPayload(req) : {}
 
-      prisma.auditLog.create({
-        data: {
-          userId: ctx.session.user.id,
-          action: opts.action,
-          resource: opts.resource,
-          resourceId: opts.getResourceId?.(req),
-          ip,
-          userAgent: req.headers.get('user-agent') ?? undefined,
-          payloadBefore: payload.before ? (payload.before as object) : undefined,
-          payloadAfter: payload.after ? (payload.after as object) : undefined
-        }
-      }).catch(console.error)
+        prisma.auditLog.create({
+          data: {
+            userId: session.user.id,
+            action: opts.action,
+            resource: opts.resource,
+            resourceId: opts.getResourceId?.(req),
+            ip,
+            userAgent: req.headers.get('user-agent') ?? undefined,
+            payloadBefore: payload.before ? (payload.before as object) : undefined,
+            payloadAfter: payload.after ? (payload.after as object) : undefined
+          }
+        }).catch(console.error)
+      }
     }
 
     return response

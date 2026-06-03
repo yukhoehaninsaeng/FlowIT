@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
-import { UserRole } from '@prisma/client'
+
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 export const POST = withAuditLog(
   withAuth(async (req, { params }) => {
@@ -25,17 +25,18 @@ export const POST = withAuditLog(
     })
 
     // 이메일 발송 (Resend)
+    const ab = campaign.abTest as { messageA?: string; messageB?: string; abEnabled?: boolean; abRatioA?: number } | null
     const sends = []
     for (const customer of customers) {
       if (campaign.type === 'EMAIL' && customer.email) {
-        const useA = !campaign.abEnabled || Math.random() * 100 < campaign.abRatioA
-        const message = useA ? campaign.messageA : (campaign.messageB ?? campaign.messageA)
+        const useA = !ab?.abEnabled || Math.random() * 100 < (ab?.abRatioA ?? 100)
+        const message = useA ? ab?.messageA : (ab?.messageB ?? ab?.messageA)
         try {
-          await resend.emails.send({
+          await getResend().emails.send({
             from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
             to: customer.email,
             subject: campaign.name,
-            html: message
+            html: message ?? ''
           })
           sends.push({ campaignId: campaign.id, customerId: customer.id, variant: useA ? 'A' : 'B', status: 'sent' })
         } catch {
@@ -53,6 +54,6 @@ export const POST = withAuditLog(
     })
 
     return NextResponse.json({ data: { sent: sends.length } })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]),
+  }, ['super_admin', 'admin', 'manager']),
   { action: 'SEND', resource: 'campaign', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-2) }
 )

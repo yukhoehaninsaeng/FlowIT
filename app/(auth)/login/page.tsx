@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,7 +8,7 @@ import { z } from 'zod'
 
 const schema = z.object({
   email: z.string().email('올바른 이메일을 입력하세요'),
-  password: z.string().min(8, '비밀번호는 8자 이상이어야 합니다')
+  password: z.string().min(1, '비밀번호를 입력하세요')
 })
 
 type FormData = z.infer<typeof schema>
@@ -26,12 +25,17 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setLoading(true)
     setError('')
-    const res = await signIn('credentials', { ...data, redirect: false })
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
     setLoading(false)
-    if (res?.error) {
+    if (!res.ok) {
       setError('이메일 또는 비밀번호가 올바르지 않습니다')
     } else {
       router.push('/')
+      router.refresh()
     }
   }
 

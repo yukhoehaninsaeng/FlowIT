@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { formatKRW } from '@/lib/utils'
 import { Search, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface Sku {
   id: string; skuCode: string; name: string; category: string; sellingPrice: string
@@ -14,17 +15,18 @@ interface Sku {
 const CATEGORIES = ['', 'skincare', 'makeup', 'suncare', 'bodycare', 'haircare']
 
 export default function InventoryPage() {
+  const router = useRouter()
   const [skus, setSkus] = useState<Sku[]>([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
 
-  const fetchSkus = async (reset = false) => {
+  const fetchSkus = useCallback(async (reset = false, currentCursor: string | null = null) => {
     const params = new URLSearchParams({ limit: '20' })
     if (search) params.set('search', search)
     if (category) params.set('category', category)
-    if (!reset && cursor) params.set('cursor', cursor)
+    if (!reset && currentCursor) params.set('cursor', currentCursor)
 
     const res = await fetch(`/api/sku?${params}`)
     const json = await res.json()
@@ -32,9 +34,9 @@ export default function InventoryPage() {
     else setSkus(prev => [...prev, ...(json.data ?? [])])
     setHasMore(json.meta?.hasMore ?? false)
     setCursor(json.meta?.nextCursor ?? null)
-  }
+  }, [search, category])
 
-  useEffect(() => { setCursor(null); fetchSkus(true) }, [search, category])
+  useEffect(() => { setCursor(null); fetchSkus(true) }, [search, category, fetchSkus])
 
   const isExpiringSoon = (date: string | null) => {
     if (!date) return false
@@ -45,7 +47,7 @@ export default function InventoryPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">재고·SKU</h1>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">
+        <button onClick={() => router.push('/products')} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-2 rounded-md text-sm hover:bg-blue-700">
           <Plus size={14} />
           SKU 추가
         </button>
@@ -85,7 +87,7 @@ export default function InventoryPage() {
           </thead>
           <tbody>
             {skus.map(sku => {
-              const totalQty = sku.inventory.reduce((s, i) => s + i.qtyAvailable, 0)
+              const totalQty = (sku.inventory ?? []).reduce((s, i) => s + i.qtyAvailable, 0)
               const expiring = isExpiringSoon(sku.lotExpiry)
               return (
                 <tr key={sku.id} className="border-b border-gray-50 hover:bg-gray-50">
@@ -118,7 +120,7 @@ export default function InventoryPage() {
         </table>
         {hasMore && (
           <div className="p-4 text-center border-t">
-            <button onClick={() => fetchSkus(false)} className="text-sm text-blue-600 hover:text-blue-700">더 보기</button>
+            <button onClick={() => fetchSkus(false, cursor)} className="text-sm text-blue-600 hover:text-blue-700">더 보기</button>
           </div>
         )}
       </div>

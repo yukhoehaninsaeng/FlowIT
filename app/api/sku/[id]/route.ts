@@ -1,17 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 
 const updateSchema = z.object({
   name: z.string().optional(),
   category: z.string().optional(),
   subCategory: z.string().optional(),
+  unit: z.string().optional(),
   ingredients: z.array(z.string()).optional(),
-  unitCost: z.number().int().positive().optional(),
-  sellingPrice: z.number().int().positive().optional(),
+  unitCost: z.number().nonnegative().optional(),
+  sellingPrice: z.number().nonnegative().optional(),
   lotExpiry: z.string().datetime().optional(),
   isActive: z.boolean().optional()
 })
@@ -39,6 +40,6 @@ export const PATCH = withAuditLog(
       }
     })
     return NextResponse.json({ data: sku })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]),
+  }, ['super_admin', 'admin', 'manager']),
   { action: 'UPDATE', resource: 'sku', getResourceId: (req) => req.nextUrl.pathname.split('/').at(-1) }
 )

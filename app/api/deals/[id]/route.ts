@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { DealStage } from '@prisma/client'
+
 
 const updateSchema = z.object({
   title: z.string().optional(),
-  stage: z.nativeEnum(DealStage).optional(),
+  stage: z.enum(['LEAD', 'MEETING', 'QUOTE', 'REVIEW', 'CLOSED']).optional(),
   amount: z.number().int().positive().optional(),
   probability: z.number().int().min(0).max(100).optional(),
   assigneeId: z.string().optional(),

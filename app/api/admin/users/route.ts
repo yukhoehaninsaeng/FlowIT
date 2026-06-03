@@ -1,17 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 import { randomBytes } from 'crypto'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 const inviteSchema = z.object({
   email: z.string().email(),
-  role: z.nativeEnum(UserRole),
+  role: z.enum(['super_admin', 'admin', 'manager', 'member', 'viewer']),
   groupId: z.string().optional()
 })
 
@@ -39,7 +39,7 @@ export const GET = withAuth(async (req) => {
     data: items,
     meta: { nextCursor: hasMore ? items[items.length - 1]?.id : null, hasMore }
   })
-}, [UserRole.SUPER_ADMIN, UserRole.ADMIN])
+}, ['super_admin', 'admin'])
 
 export const POST = withAuditLog(
   withAuth(async (req) => {
@@ -60,7 +60,7 @@ export const POST = withAuditLog(
     })
 
     const inviteUrl = `${process.env.AUTH_URL}/invite/${token}`
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
       to: body.data.email,
       subject: 'FlowIT CRM 초대',
@@ -68,6 +68,6 @@ export const POST = withAuditLog(
     })
 
     return NextResponse.json({ data: invite }, { status: 201 })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN]),
+  }, ['super_admin', 'admin']),
   { action: 'INVITE', resource: 'user' }
 )

@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { prisma } from '@/lib/db'
-import { UserRole } from '@prisma/client'
+
 import Papa from 'papaparse'
 
 export const GET = withAuth(async (req) => {
@@ -35,7 +35,7 @@ export const GET = withAuth(async (req) => {
       include: { user: { select: { name: true, email: true } } }
     })
     const csv = Papa.unparse(logs.map(l => ({
-      id: l.id, user: l.user.name, email: l.user.email,
+      id: l.id, user: l.user?.name, email: l.user?.email,
       action: l.action, resource: l.resource, resourceId: l.resourceId,
       ip: l.ip, createdAt: l.createdAt.toISOString()
     })))
@@ -60,4 +60,4 @@ export const GET = withAuth(async (req) => {
     data: items,
     meta: { nextCursor: hasMore ? items[items.length - 1]?.id : null, hasMore }
   })
-}, [UserRole.SUPER_ADMIN, UserRole.ADMIN])
+}, ['super_admin', 'admin'])

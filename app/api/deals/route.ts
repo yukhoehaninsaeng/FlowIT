@@ -1,14 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { DealStage } from '@prisma/client'
+
 
 const createSchema = z.object({
   accountId: z.string().min(1),
   title: z.string().min(1),
-  stage: z.nativeEnum(DealStage).default('LEAD'),
+  stage: z.enum(['LEAD', 'MEETING', 'QUOTE', 'REVIEW', 'CLOSED']).default('LEAD'),
   amount: z.number().int().positive(),
   probability: z.number().int().min(0).max(100).default(50),
   assigneeId: z.string().optional(),
@@ -18,7 +18,7 @@ const createSchema = z.object({
 
 export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl
-  const stage = searchParams.get('stage') as DealStage | null
+  const stage = searchParams.get('stage')
   const cursor = searchParams.get('cursor') ?? undefined
   const limit = Math.min(Number(searchParams.get('limit') ?? 50), 200)
 

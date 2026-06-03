@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { CampaignType, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -44,12 +44,12 @@ export const POST = withAuditLog(
     if (!body.success) {
       return NextResponse.json({ error: 'Validation failed', details: body.error.flatten() }, { status: 400 })
     }
-    const { segmentFilter, scheduledAt, ...rest } = body.data
+    const { segmentFilter, scheduledAt, messageA, messageB, abEnabled, abRatioA, ...rest } = body.data
     const campaign = await prisma.campaign.create({
       data: {
         ...rest,
-        type: rest.type as CampaignType,
         segmentFilter: segmentFilter as Prisma.InputJsonObject,
+        abTest: { messageA, messageB, abEnabled, abRatioA } as Prisma.InputJsonObject,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
         createdById: session.user.id
       }

@@ -1,9 +1,9 @@
 import { prisma } from '@/lib/db'
-import { Channel } from '@prisma/client'
+
 import { normalizeEmail, normalizePhone } from '@/lib/utils'
 
 interface IdentityInput {
-  channel: Channel
+  channel: string
   channelUserId: string
   email?: string
   phone?: string
@@ -15,8 +15,8 @@ export async function resolveCustomerId(input: IdentityInput): Promise<string> {
   const { channel, channelUserId, email, phone, name, address } = input
 
   // 1. 기존 channel identity로 조회
-  const existingIdentity = await prisma.customerIdentity.findUnique({
-    where: { channel_channelUserId: { channel, channelUserId } }
+  const existingIdentity = await prisma.customerIdentity.findFirst({
+    where: { channel, channelUserId }
   })
   if (existingIdentity) return existingIdentity.customerId
 
@@ -79,15 +79,16 @@ export async function resolveCustomerId(input: IdentityInput): Promise<string> {
 
 async function linkIdentity(
   customerId: string,
-  channel: Channel,
+  channel: string,
   channelUserId: string,
   type: string,
   value: string,
   confidenceScore = 1.0
 ) {
-  await prisma.customerIdentity.upsert({
-    where: { channel_channelUserId: { channel, channelUserId } },
-    create: { customerId, channel, channelUserId, identifierType: type, identifierValue: value, confidenceScore },
-    update: {}
-  })
+  const existing = await prisma.customerIdentity.findFirst({ where: { channel, channelUserId } })
+  if (!existing) {
+    await prisma.customerIdentity.create({
+      data: { customerId, channel, channelUserId, identifierType: type, identifierValue: value, confidenceScore }
+    })
+  }
 }

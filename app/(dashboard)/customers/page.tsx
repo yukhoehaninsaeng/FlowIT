@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { formatKRW, maskEmail } from '@/lib/utils'
-import { Search, ChevronDown } from 'lucide-react'
+import { Search, Plus, X, Loader2, Pencil } from 'lucide-react'
 
 interface Customer {
   id: string; name: string | null; email: string | null; phone: string | null
-  segment: string; ltv: string; skinType: string | null; lastOrderAt: string | null
+  segment: string; ltv: string; skinType: string | null
+  gender: string | null; birthYear: number | null
 }
 
 const SEGMENTS = ['', 'vip', 'loyal', 'normal', 'churn_risk', 'new']
@@ -22,6 +23,8 @@ const SEGMENT_COLOR: Record<string, string> = {
   new: 'bg-green-100 text-green-700'
 }
 
+const DEFAULT_FORM = { name: '', email: '', phone: '', gender: '', birthYear: '', skinType: '', segment: 'new' }
+
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [search, setSearch] = useState('')
@@ -29,71 +32,122 @@ export default function CustomersPage() {
   const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [form, setForm] = useState(DEFAULT_FORM)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  const fetchCustomers = useCallback(async (reset = false) => {
+  const fetchCustomers = useCallback(async (reset = false, currentCursor: string | null = null) => {
     setLoading(true)
     const params = new URLSearchParams({ limit: '20' })
     if (search) params.set('search', search)
     if (segment) params.set('segment', segment)
-    if (!reset && cursor) params.set('cursor', cursor)
-
+    if (!reset && currentCursor) params.set('cursor', currentCursor)
     const res = await fetch(`/api/customers?${params}`)
     const json = await res.json()
     setLoading(false)
-    if (reset) {
-      setCustomers(json.data ?? [])
-    } else {
-      setCustomers(prev => [...prev, ...(json.data ?? [])])
-    }
+    if (reset) setCustomers(json.data ?? [])
+    else setCustomers(prev => [...prev, ...(json.data ?? [])])
     setHasMore(json.meta?.hasMore ?? false)
     setCursor(json.meta?.nextCursor ?? null)
-  }, [search, segment, cursor])
-
-  useEffect(() => {
-    setCursor(null)
-    fetchCustomers(true)
   }, [search, segment])
+
+  useEffect(() => { setCursor(null); fetchCustomers(true) }, [search, segment, fetchCustomers])
+
+  function openCreate() {
+    setEditId(null); setForm(DEFAULT_FORM); setError(''); setShowModal(true)
+  }
+
+  function openEdit(c: Customer) {
+    setEditId(c.id)
+    setForm({
+      name: c.name ?? '',
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      gender: c.gender ?? '',
+      birthYear: c.birthYear ? String(c.birthYear) : '',
+      skinType: c.skinType ?? '',
+      segment: c.segment,
+    })
+    setError(''); setShowModal(true)
+  }
+
+  async function handleSave() {
+    if (!form.name && !form.email && !form.phone) {
+      setError('이름, 이메일, 전화번호 중 하나는 필수입니다.')
+      return
+    }
+    setSaving(true); setError('')
+    try {
+      const body: Record<string, unknown> = {}
+      if (form.name) body.name = form.name
+      if (form.email) body.email = form.email
+      if (form.phone) body.phone = form.phone
+      if (form.gender) body.gender = form.gender
+      if (form.birthYear) body.birthYear = parseInt(form.birthYear)
+      if (form.skinType) body.skinType = form.skinType
+      if (form.segment) body.segment = form.segment
+
+      const r = editId
+        ? await fetch(`/api/customers/${editId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        : await fetch('/api/customers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+      if (!r.ok) { const d = await r.json(); setError(d.error ?? '저장에 실패했습니다.'); return }
+      setShowModal(false); setForm(DEFAULT_FORM); setEditId(null)
+      fetchCustomers(true)
+    } finally { setSaving(false) }
+  }
+
+  function Field({ label, name, type = 'text', placeholder = '' }: { label: string; name: keyof typeof form; type?: string; placeholder?: string }) {
+    return (
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">{label}</label>
+        <input
+          type={type}
+          value={form[name]}
+          onChange={e => setForm(p => ({ ...p, [name]: e.target.value }))}
+          placeholder={placeholder}
+          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-gray-900">고객</h1>
+        <button onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700">
+          <Plus size={14} /> 고객 등록
+        </button>
       </div>
 
-      {/* 검색/필터 */}
       <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="이름, 이메일, 전화번호 검색"
-            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
-
-        <select
-          value={segment}
-          onChange={e => setSegment(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <select value={segment} onChange={e => setSegment(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">전체 세그먼트</option>
-          {SEGMENTS.filter(Boolean).map(s => (
-            <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>
-          ))}
+          {SEGMENTS.filter(Boolean).map(s => <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>)}
         </select>
       </div>
 
-      {/* 테이블 */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100 bg-gray-50">
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이름</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이메일</th>
+              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">전화번호</th>
               <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">세그먼트</th>
               <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">LTV</th>
-              <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">최근 구매일</th>
+              <th className="w-10" />
             </tr>
           </thead>
           <tbody>
@@ -105,35 +159,91 @@ export default function CustomersPage() {
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-gray-500">{c.email ? maskEmail(c.email) : '-'}</td>
+                <td className="px-4 py-3 text-gray-500">{c.phone ?? '-'}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${SEGMENT_COLOR[c.segment] ?? 'bg-gray-100 text-gray-600'}`}>
                     {SEGMENT_LABEL[c.segment] ?? c.segment}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-right text-gray-900 font-medium">{formatKRW(Number(c.ltv))}</td>
-                <td className="px-4 py-3 text-gray-500">
-                  {c.lastOrderAt ? new Date(c.lastOrderAt).toLocaleDateString('ko-KR') : '-'}
+                <td className="px-4 py-2">
+                  <button onClick={() => openEdit(c)} className="p-1 text-gray-300 hover:text-blue-500 rounded">
+                    <Pencil size={13} />
+                  </button>
                 </td>
               </tr>
             ))}
             {customers.length === 0 && !loading && (
-              <tr><td colSpan={5} className="text-center py-12 text-gray-400 text-sm">고객이 없습니다</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-gray-400 text-sm">고객이 없습니다</td></tr>
             )}
           </tbody>
         </table>
-
         {hasMore && (
           <div className="p-4 text-center border-t border-gray-100">
-            <button
-              onClick={() => fetchCustomers(false)}
-              disabled={loading}
-              className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50"
-            >
+            <button onClick={() => fetchCustomers(false, cursor)} disabled={loading}
+              className="text-sm text-blue-600 hover:text-blue-700 disabled:opacity-50">
               {loading ? '로딩 중...' : '더 보기'}
             </button>
           </div>
         )}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-900">{editId ? '고객 수정' : '고객 등록'}</h2>
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
+              <Field label="이름" name="name" placeholder="홍길동" />
+              {!editId && <Field label="이메일" name="email" type="email" placeholder="hong@company.com" />}
+              {!editId && <Field label="전화번호" name="phone" placeholder="010-0000-0000" />}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">성별</label>
+                  <select value={form.gender} onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white">
+                    <option value="">선택</option>
+                    <option value="M">남성</option>
+                    <option value="F">여성</option>
+                  </select>
+                </div>
+                <Field label="출생연도" name="birthYear" type="number" placeholder="1990" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">세그먼트</label>
+                  <select value={form.segment} onChange={e => setForm(p => ({ ...p, segment: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white">
+                    {SEGMENTS.filter(Boolean).map(s => <option key={s} value={s}>{SEGMENT_LABEL[s] ?? s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">피부 타입</label>
+                  <select value={form.skinType} onChange={e => setForm(p => ({ ...p, skinType: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white">
+                    <option value="">선택</option>
+                    <option value="dry">건성</option>
+                    <option value="oily">지성</option>
+                    <option value="combination">복합성</option>
+                    <option value="sensitive">민감성</option>
+                    <option value="normal">중성</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 px-6 py-4 border-t border-gray-200">
+              <button onClick={handleSave} disabled={saving}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50">
+                {saving && <Loader2 size={13} className="animate-spin" />} {editId ? '저장' : '등록'}
+              </button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">취소</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

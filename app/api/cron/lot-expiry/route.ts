@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+function getResend() { return new Resend(process.env.RESEND_API_KEY) }
 
 // Vercel Cron: 매일 09:00 KST
 export const POST = async () => {
   const now = new Date()
-  const d7 = new Date(now.getTime() + 7 * 86400000)
-  const d30 = new Date(now.getTime() + 30 * 86400000)
   const d60 = new Date(now.getTime() + 60 * 86400000)
 
   const expiringSkus = await prisma.skuMaster.findMany({
@@ -31,7 +29,7 @@ export const POST = async () => {
   })
 
   for (const admin of admins) {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: process.env.EMAIL_FROM ?? 'noreply@flowit.kr',
       to: admin.email,
       subject: `[FlowIT] 유통기한 임박 SKU ${expiringSkus.length}건`,

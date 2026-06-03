@@ -1,18 +1,19 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/middleware/withAuth'
 import { withAuditLog } from '@/lib/middleware/withAuditLog'
 import { prisma } from '@/lib/db'
 import { z } from 'zod'
-import { UserRole } from '@prisma/client'
+
 
 const createSchema = z.object({
   skuCode: z.string().min(1),
   name: z.string().min(1),
   category: z.string().min(1),
   subCategory: z.string().optional(),
+  unit: z.string().optional(),
   ingredients: z.array(z.string()).default([]),
-  unitCost: z.number().int().positive(),
-  sellingPrice: z.number().int().positive(),
+  unitCost: z.number().nonnegative().optional(),
+  sellingPrice: z.number().nonnegative().optional(),
   lotExpiry: z.string().datetime().optional(),
   isBundle: z.boolean().default(false)
 })
@@ -38,7 +39,10 @@ export const GET = withAuth(async (req) => {
     take: limit + 1,
     cursor: cursor ? { id: cursor } : undefined,
     skip: cursor ? 1 : 0,
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    include: {
+      inventory: { select: { channel: true, qtyAvailable: true } }
+    }
   })
 
   const hasMore = items.length > limit
@@ -63,6 +67,6 @@ export const POST = withAuditLog(
       }
     })
     return NextResponse.json({ data: sku }, { status: 201 })
-  }, [UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER]),
+  }, ['super_admin', 'admin', 'manager']),
   { action: 'CREATE', resource: 'sku' }
 )
