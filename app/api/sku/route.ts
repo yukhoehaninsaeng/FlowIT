@@ -39,7 +39,10 @@ export const GET = withAuth(async (req) => {
     take: limit + 1,
     cursor: cursor ? { id: cursor } : undefined,
     skip: cursor ? 1 : 0,
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    include: {
+      inventory: { select: { channel: true, qtyAvailable: true } }
+    }
   })
 
   const hasMore = items.length > limit

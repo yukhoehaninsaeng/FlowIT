@@ -87,7 +87,7 @@ export default function InventoryPage() {
           </thead>
           <tbody>
             {skus.map(sku => {
-              const totalQty = sku.inventory.reduce((s, i) => s + i.qtyAvailable, 0)
+              const totalQty = (sku.inventory ?? []).reduce((s, i) => s + i.qtyAvailable, 0)
               const expiring = isExpiringSoon(sku.lotExpiry)
               return (
                 <tr key={sku.id} className="border-b border-gray-50 hover:bg-gray-50">
