@@ -88,7 +88,7 @@ export default function SettlementsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <div className="text-xs text-gray-500 mb-1">지급 완료</div>
           <div className="text-2xl font-bold text-green-600">₩{totalPaid.toLocaleString()}</div>

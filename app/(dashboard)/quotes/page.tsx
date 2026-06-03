@@ -189,7 +189,7 @@ export default function QuotesPage() {
     <>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
             {(['draft', 'sent', 'accepted', 'rejected', 'expired'] as const).map(st => {
               const cfg = STATUS_CONFIG[st]
               const cnt = quotes.filter(q => q.status === st).length

@@ -80,7 +80,7 @@ function MobileMenuGrid() {
         return (
           <div key={cat}>
             <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">{CATEGORY_LABELS[cat]}</p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-3 gap-3">
               {items.map(({ key, href, label }) => {
                 const def = MODULE_REGISTRY.find(d => d.key === key)
                 const Icon = def?.icon
@@ -230,7 +230,7 @@ export default function DashboardClient() {
         {orderedWidgets.filter(w => w.enabled).map(w => {
           switch (w.id) {
             case 'kpi': return (
-              <div key="kpi" className="grid grid-cols-4 gap-4">
+              <div key="kpi" className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 <KpiCard label="이번달 총 매출" value={formatKRW(totalRevenue)} icon={<CreditCard size={20} className="text-blue-600" />} bg="bg-blue-50" />
                 <KpiCard label="활성 고객 수" value={(customerData?.active ?? 0).toLocaleString()} icon={<Users size={20} className="text-green-600" />} bg="bg-green-50" />
                 <KpiCard label="평균 LTV" value={formatKRW(Number(customerData?.avgLtv ?? 0))} icon={<TrendingUp size={20} className="text-purple-600" />} bg="bg-purple-50" />
@@ -244,11 +244,11 @@ export default function DashboardClient() {
                   <span className="text-xs text-gray-400">예상 매출 {formatKRW(totalPipeline)}</span>
                 </div>
                 {dealSummary.length > 0 ? (
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
                     {['LEAD','MEETING','QUOTE','REVIEW','CLOSED'].map(stage => {
                       const s = dealSummary.find(d => d.stage === stage)
                       return (
-                        <div key={stage} className={`flex-1 ${STAGE_COLOR[stage]} rounded-lg p-3`}>
+                        <div key={stage} className={`${STAGE_COLOR[stage]} rounded-lg p-3`}>
                           <p className="text-xs font-medium text-gray-600">{STAGE_LABEL[stage]}</p>
                           <p className="text-2xl font-bold text-gray-900 mt-1">{s?.count ?? 0}</p>
                           <p className="text-xs text-gray-500 mt-0.5">{formatKRW(s?.totalAmount ?? 0)}</p>
@@ -278,7 +278,7 @@ export default function DashboardClient() {
             case 'segment_chart': return (
               <div key="segment_chart" className="bg-white rounded-xl border border-gray-200 p-5">
                 <h2 className="text-sm font-semibold text-gray-900 mb-4">고객 세그먼트</h2>
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <SegmentCard label="VIP" count={customerData?.vip ?? 0} color="text-yellow-600 bg-yellow-50" />
                   <SegmentCard label="이탈 위험" count={customerData?.churnRisk ?? 0} color="text-red-600 bg-red-50" />
                   <SegmentCard label="전체 활성" count={customerData?.active ?? 0} color="text-blue-600 bg-blue-50" />

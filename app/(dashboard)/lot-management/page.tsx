@@ -42,7 +42,7 @@ export default function LotManagementPage() {
     <>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4 flex items-center gap-3">
               <CheckCircle size={20} className="text-green-500 flex-shrink-0" />
               <div>

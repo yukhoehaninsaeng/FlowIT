@@ -75,7 +75,7 @@ export default function ForecastPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div className="bg-white/10 rounded-lg p-3">
                 <div className="text-xs text-blue-200">예측 SKU 수</div>
                 <div className="text-2xl font-bold">{forecasts.length}</div>

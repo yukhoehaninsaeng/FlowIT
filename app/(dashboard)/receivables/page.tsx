@@ -121,7 +121,7 @@ export default function ReceivablesPage() {
     <>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-lg border border-gray-200 p-4">
               <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
                 <DollarSign size={14} className="text-blue-500" /> 총 미수금

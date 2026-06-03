@@ -75,7 +75,7 @@ export default function ReturnsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: '전체 반품', value: returns.length, color: 'text-gray-900' },
           { label: '처리 대기', value: pending, color: 'text-orange-600' },

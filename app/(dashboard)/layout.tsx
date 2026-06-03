@@ -7,7 +7,7 @@ import { SidebarProvider } from '@/components/layout/SidebarContext'
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 overflow-x-hidden">
         <Sidebar />
         <div className="lg:ml-[220px]">
           <Topbar title="FlowIT CRM" />
