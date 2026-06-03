@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <Sidebar />
         <div className="lg:ml-[220px]">
           <Topbar title="FlowIT CRM" />
-          <main className="pt-16 p-4 lg:p-6">
+          <main className="pt-16 px-4 pb-4 lg:px-6 lg:pb-6">
             {children}
           </main>
         </div>
