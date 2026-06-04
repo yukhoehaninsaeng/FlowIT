@@ -124,8 +124,8 @@ function SortableCard({ config, onDelete, onResize }: BaseCardProps) {
     <div ref={setNodeRef} style={style} className={COL_SPAN_CLASSES[config.colSpan] ?? 'col-span-6'}>
       <ChartCard
         config={config} onDelete={onDelete} onResize={onResize}
-        dragListeners={listeners as Record<string, unknown>}
-        dragAttributes={attributes as Record<string, unknown>}
+        dragListeners={listeners as unknown as Record<string, unknown>}
+        dragAttributes={attributes as unknown as Record<string, unknown>}
         isDragging={isDragging}
       />
     </div>
