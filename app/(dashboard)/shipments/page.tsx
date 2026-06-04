@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Search, Truck, X, Loader2 } from 'lucide-react'
+import { SearchInput } from '@/components/ui/SearchInput'
 
 interface Shipment {
   id: string; trackingNo: string | null; carrier: string | null; status: string
   recipientName: string | null; recipientAddress: string | null
   boxCount: number | null; shippedAt: string | null; deliveredAt: string | null; createdAt: string
 }
+
+interface Account { id: string; name: string; contactName: string | null; contactPhone: string | null; address: string | null }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   preparing:  { label: '준비중', color: 'bg-gray-100 text-gray-700' },
@@ -19,7 +22,17 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 const CARRIERS = ['CJ대한통운', '롯데택배', '한진택배', '우체국택배', '로젠택배', '쿠팡로켓', '직접배송']
 
-const DEFAULT_FORM = { trackingNo: '', carrier: '', recipientName: '', recipientAddress: '', boxCount: '', shippedAt: '' }
+const DEFAULT_FORM = {
+  trackingNo: '', carrier: '',
+  recipientName: '', recipientAddress: '',
+  boxCount: '', shippedAt: '',
+}
+
+async function fetchAccounts(q: string): Promise<Account[]> {
+  const r = await fetch(`/api/accounts?q=${encodeURIComponent(q)}`)
+  const d = await r.json()
+  return (d.accounts ?? []).slice(0, 8)
+}
 
 export default function ShipmentsPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
@@ -154,11 +167,30 @@ export default function ShipmentsPage() {
                     placeholder="1234567890123"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">수령인</label>
-                  <input value={form.recipientName} onChange={e => setForm(p => ({ ...p, recipientName: e.target.value }))}
-                    placeholder="홍길동"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">수령인 (거래처 검색)</label>
+                  <SearchInput<Account>
+                    value={form.recipientName}
+                    onInputChange={v => setForm(p => ({ ...p, recipientName: v }))}
+                    onSelect={acc => setForm(p => ({
+                      ...p,
+                      recipientName: acc.contactName || acc.name,
+                      recipientAddress: acc.address || p.recipientAddress,
+                    }))}
+                    fetchOptions={fetchAccounts}
+                    placeholder="거래처명 또는 담당자 검색"
+                    renderOption={acc => (
+                      <div>
+                        <span className="font-medium text-gray-900">{acc.name}</span>
+                        {acc.contactName && (
+                          <span className="text-xs text-gray-400 ml-2">{acc.contactName}</span>
+                        )}
+                        {acc.address && (
+                          <div className="text-xs text-gray-400 truncate mt-0.5">{acc.address}</div>
+                        )}
+                      </div>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">박스 수</label>
@@ -166,15 +198,15 @@ export default function ShipmentsPage() {
                     placeholder="1"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">발송일</label>
+                  <input type="date" value={form.shippedAt} onChange={e => setForm(p => ({ ...p, shippedAt: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-gray-500 mb-1">배송지 주소</label>
                   <input value={form.recipientAddress} onChange={e => setForm(p => ({ ...p, recipientAddress: e.target.value }))}
                     placeholder="서울시 강남구 ..."
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">발송일</label>
-                  <input type="date" value={form.shippedAt} onChange={e => setForm(p => ({ ...p, shippedAt: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>

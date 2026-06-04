@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Plus, Search, ArrowDownCircle, ArrowUpCircle, MoveRight, Warehouse, MapPin, X, Loader2 } from 'lucide-react'
+import { SearchInput } from '@/components/ui/SearchInput'
 
 interface Location {
   id: string; code: string; name: string; zone: string | null; capacity: number | null; isActive: boolean
@@ -12,6 +13,8 @@ interface Movement {
   locationCode: string | null; qty: number; lotNumber: string | null; notes: string | null; createdAt: string
 }
 
+interface Sku { id: string; skuCode: string; name: string; unit: string | null }
+
 const MOVE_TYPE: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
   inbound:  { label: '입고',     icon: <ArrowDownCircle size={13} />, color: 'text-green-600' },
   outbound: { label: '출고',     icon: <ArrowUpCircle size={13} />,   color: 'text-red-600' },
@@ -21,7 +24,19 @@ const MOVE_TYPE: Record<string, { label: string; icon: React.ReactNode; color: s
 }
 
 const DEFAULT_LOC_FORM = { code: '', name: '', zone: '', capacity: '' }
-const DEFAULT_MOVE_FORM = { type: 'inbound', locationId: '', skuCode: '', skuName: '', qty: '1', lotNumber: '', notes: '' }
+const DEFAULT_MOVE_FORM = {
+  type: 'inbound', locationId: '',
+  skuDisplay: '',
+  skuCode: '',
+  skuName: '',
+  qty: '1', lotNumber: '', notes: '',
+}
+
+async function fetchSkus(q: string): Promise<Sku[]> {
+  const r = await fetch(`/api/sku?search=${encodeURIComponent(q)}&limit=8`)
+  const d = await r.json()
+  return d.data ?? []
+}
 
 export default function WarehousePage() {
   const [tab, setTab] = useState<'locations' | 'movements'>('locations')
@@ -75,7 +90,8 @@ export default function WarehousePage() {
   }
 
   async function handleCreateMovement() {
-    if (!moveForm.skuCode.trim()) { setMoveError('SKU 코드를 입력하세요.'); return }
+    const actualSkuCode = moveForm.skuCode || moveForm.skuDisplay.trim()
+    if (!actualSkuCode) { setMoveError('품목을 입력하세요.'); return }
     if (!moveForm.qty || Number(moveForm.qty) <= 0) { setMoveError('수량을 입력하세요.'); return }
     setMoveSaving(true); setMoveError('')
     try {
@@ -85,8 +101,8 @@ export default function WarehousePage() {
         body: JSON.stringify({
           type: moveForm.type,
           locationId: moveForm.locationId || null,
-          skuCode: moveForm.skuCode.trim(),
-          skuName: moveForm.skuName.trim() || null,
+          skuCode: actualSkuCode,
+          skuName: moveForm.skuName || null,
           qty: Number(moveForm.qty),
           lotNumber: moveForm.lotNumber.trim() || null,
           notes: moveForm.notes.trim() || null,
@@ -295,22 +311,32 @@ export default function WarehousePage() {
                     {locations.map(l => <option key={l.id} value={l.id}>{l.code} — {l.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">SKU 코드 *</label>
-                  <input value={moveForm.skuCode} onChange={e => setMoveForm(p => ({ ...p, skuCode: e.target.value }))}
-                    placeholder="SKU-001"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <div className="col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">품목 *</label>
+                  <SearchInput<Sku>
+                    value={moveForm.skuDisplay}
+                    onInputChange={v => setMoveForm(p => ({ ...p, skuDisplay: v, skuCode: '', skuName: '' }))}
+                    onSelect={sku => setMoveForm(p => ({
+                      ...p,
+                      skuDisplay: `${sku.skuCode} · ${sku.name}`,
+                      skuCode: sku.skuCode,
+                      skuName: sku.name,
+                    }))}
+                    fetchOptions={fetchSkus}
+                    placeholder="SKU 코드 또는 상품명 검색"
+                    renderOption={sku => (
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs text-gray-400">{sku.skuCode}</span>
+                        <span className="text-gray-900">{sku.name}</span>
+                        {sku.unit && <span className="text-xs text-gray-400">/{sku.unit}</span>}
+                      </div>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">수량 *</label>
                   <input type="number" min={1} value={moveForm.qty} onChange={e => setMoveForm(p => ({ ...p, qty: e.target.value }))}
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-right" />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-gray-500 mb-1">상품명</label>
-                  <input value={moveForm.skuName} onChange={e => setMoveForm(p => ({ ...p, skuName: e.target.value }))}
-                    placeholder="상품명 (선택)"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">LOT 번호</label>
@@ -318,7 +344,7 @@ export default function WarehousePage() {
                     placeholder="LOT-20240101"
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div>
+                <div className="col-span-2">
                   <label className="block text-xs text-gray-500 mb-1">비고</label>
                   <input value={moveForm.notes} onChange={e => setMoveForm(p => ({ ...p, notes: e.target.value }))}
                     placeholder="특이사항"
