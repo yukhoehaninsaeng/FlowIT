@@ -68,7 +68,7 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
   function handleAdd() {
     if (!hasPreview || previewData.length === 0) return
     const dimInfo    = DIMENSIONS.find(d => d.value === dimension)!
-    const metricInfo = METRICS_BY_DIM[dimension]?.find(m => m.value === metric)!
+    const metricInfo = (METRICS_BY_DIM[dimension] ?? []).find(m => m.value === metric)!
     const m2Info     = metric2 ? METRICS_BY_DIM[dimension]?.find(m => m.value === metric2) : undefined
 
     const config: ChartConfig = {
