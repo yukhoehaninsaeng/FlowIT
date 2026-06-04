@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { MODULE_REGISTRY, CATEGORY_LABELS, INDUSTRY_PRESETS, type ModuleCategory } from '@/lib/modules/registry'
-import { ToggleLeft, ToggleRight, Loader2, CheckCircle, RefreshCw, AlertTriangle, Info } from 'lucide-react'
+import { ToggleLeft, ToggleRight, Loader2, CheckCircle, RefreshCw, AlertTriangle, Info, Database, Trash2 } from 'lucide-react'
 
 interface ModuleState {
   key: string
@@ -29,6 +29,8 @@ export default function ModulesPage() {
   const [industry, setIndustry] = useState('general')
   const [dbReady, setDbReady] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [seeding, setSeeding] = useState(false)
+  const [seedResult, setSeedResult] = useState<{ ok: boolean; message: string; summary?: Record<string, number> } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -105,6 +107,23 @@ export default function ModulesPage() {
     }
   }
 
+  async function runSeed() {
+    if (!confirm('기존 데이터를 모두 삭제하고 테스트 데이터를 생성합니다. 계속하시겠습니까?')) return
+    setSeeding(true)
+    setSeedResult(null)
+    setError(null)
+    try {
+      const r = await fetch('/api/seed', { method: 'POST' })
+      const d = await r.json()
+      if (!r.ok) { setError(d.error ?? '시드 실패'); return }
+      setSeedResult(d)
+    } catch {
+      setError('시드 실행 중 오류가 발생했습니다.')
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   const categories = Array.from(new Set(MODULE_REGISTRY.map(m => m.category))) as ModuleCategory[]
 
   return (
@@ -131,6 +150,40 @@ export default function ModulesPage() {
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
+
+          {/* 테스트 데이터 시드 */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900 mb-1">테스트 데이터 생성</h2>
+                <p className="text-xs text-gray-500">고객·주문·딜·재고·캠페인 등 전체 샘플 데이터를 생성합니다. <span className="text-red-600 font-medium">기존 데이터는 모두 삭제됩니다.</span></p>
+              </div>
+              <button
+                onClick={runSeed}
+                disabled={seeding}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md hover:bg-orange-700 disabled:opacity-50 ml-4"
+              >
+                {seeding ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                {seeding ? '생성 중...' : '테스트 데이터 생성'}
+              </button>
+            </div>
+            {seedResult && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <p className="text-sm font-medium text-green-800 mb-2 flex items-center gap-1.5">
+                  <CheckCircle size={14} /> {seedResult.message}
+                </p>
+                {seedResult.summary && (
+                  <div className="flex flex-wrap gap-3">
+                    {Object.entries(seedResult.summary).map(([k, v]) => (
+                      <span key={k} className="text-xs text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                        {k}: {v}개
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* 업종 프리셋 */}
           <div className="bg-white rounded-lg border border-gray-200 p-5 mb-6">
