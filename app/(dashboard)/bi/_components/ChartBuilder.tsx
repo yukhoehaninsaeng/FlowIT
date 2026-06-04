@@ -33,6 +33,7 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
   const [period, setPeriod]       = useState('monthly')
   const [title, setTitle]         = useState('')
   const [previewData, setPreviewData] = useState<DataPoint[]>([])
+  const [previewSeries, setPreviewSeries] = useState<string[]>([])
   const [previewing, setPreviewing]   = useState(false)
   const [hasPreview, setHasPreview]   = useState(false)
 
@@ -61,6 +62,7 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
       const r = await fetch(`/api/bi?type=flex&dimension=${dimension}&metric=${metric}${m2}&period=${period}`)
       const d = await r.json()
       setPreviewData(d.data ?? [])
+      setPreviewSeries(d.series ?? [])
       setHasPreview(true)
     } finally { setPreviewing(false) }
   }, [dimension, metric, metric2, chartType, period, isMulti])
@@ -82,9 +84,10 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
       metric2Label: m2Info?.label,
       isCurrency:   metricInfo?.isCurrency  ?? false,
       isCurrency2:  m2Info?.isCurrency,
+      series:       previewSeries.length > 0 ? previewSeries : undefined,
     }
     onAddToDashboard(config)
-    setTitle(''); setHasPreview(false)
+    setTitle(''); setHasPreview(false); setPreviewSeries([])
   }
 
   const metricInfo  = METRICS_BY_DIM[dimension]?.find(m => m.value === metric)
@@ -195,6 +198,7 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
               label1={metricInfo?.label ?? metric}
               label2={metric2Info?.label ?? metric2}
               height={300}
+              series={previewSeries.length > 0 ? previewSeries : undefined}
             />
           )
         ) : (

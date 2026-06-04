@@ -5,19 +5,34 @@ import { prisma } from '@/lib/db'
 
 const PAID = ['PAID', 'SHIPPED', 'DELIVERED']
 
+function parsePeriod(period: string): { start: Date; end?: Date } {
+  const now = new Date()
+  const yearMatch = period.match(/^year_(\d{4})$/)
+  if (yearMatch) {
+    const yr = parseInt(yearMatch[1])
+    return { start: new Date(yr, 0, 1), end: new Date(yr + 1, 0, 1) }
+  }
+  if (period === 'monthly')   return { start: new Date(now.getFullYear(), now.getMonth(), 1) }
+  if (period === 'quarterly') return { start: new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1) }
+  return { start: new Date(now.getFullYear(), 0, 1) }
+}
+
 export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl
-  const type = searchParams.get('type') ?? 'sales'
+  const type   = searchParams.get('type')   ?? 'sales'
   const period = searchParams.get('period') ?? 'monthly'
-  const skuId = searchParams.get('skuId')
+  const skuId  = searchParams.get('skuId')
+
+  const { start: periodStart, end: periodEnd } = parsePeriod(period)
+
+  // Build date filter helper
+  function dateWhere() {
+    return periodEnd
+      ? { gte: periodStart, lt: periodEnd }
+      : { gte: periodStart }
+  }
 
   const now = new Date()
-  const periodStart = period === 'monthly'
-    ? new Date(now.getFullYear(), now.getMonth(), 1)
-    : period === 'quarterly'
-    ? new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
-    : new Date(now.getFullYear(), 0, 1)
-
   const cacheKey = `${type}_${period}_${now.getFullYear()}_${now.getMonth()}`
   const cached = await prisma.biCache.findUnique({ where: { key: cacheKey } })
   if (cached && (Date.now() - cached.computedAt.getTime()) < 3600000) {
@@ -29,7 +44,7 @@ export const GET = withAuth(async (req) => {
   if (type === 'sales') {
     const orders = await prisma.order.groupBy({
       by: ['channel'],
-      where: { status: { in: PAID }, orderedAt: { gte: periodStart } },
+      where: { status: { in: PAID }, orderedAt: dateWhere() },
       _sum: { totalAmount: true },
       _count: { id: true }
     })
@@ -46,11 +61,11 @@ export const GET = withAuth(async (req) => {
   } else if (type === 'marketing') {
     const sends = await prisma.campaignSend.aggregate({
       _count: { id: true },
-      where: { sentAt: { gte: periodStart } }
+      where: { sentAt: dateWhere() }
     })
-    const opens = await prisma.campaignSend.count({ where: { sentAt: { gte: periodStart }, openedAt: { not: null } } })
-    const conversions = await prisma.campaignSend.count({ where: { sentAt: { gte: periodStart }, convertedAt: { not: null } } })
-    const revenue = await prisma.campaignSend.aggregate({ _sum: { revenueAttr: true }, where: { sentAt: { gte: periodStart } } })
+    const opens = await prisma.campaignSend.count({ where: { sentAt: dateWhere(), openedAt: { not: null } } })
+    const conversions = await prisma.campaignSend.count({ where: { sentAt: dateWhere(), convertedAt: { not: null } } })
+    const revenue = await prisma.campaignSend.aggregate({ _sum: { revenueAttr: true }, where: { sentAt: dateWhere() } })
     data = {
       totalSent: sends._count.id,
       openRate: sends._count.id > 0 ? opens / sends._count.id : 0,
@@ -66,8 +81,8 @@ export const GET = withAuth(async (req) => {
     data = { expiringSkus: expiring }
   } else if (type === 'flex') {
     const dimension = searchParams.get('dimension') ?? 'channel'
-    const metric    = searchParams.get('metric')  ?? 'revenue'
-    const metric2   = searchParams.get('metric2') ?? null
+    const metric    = searchParams.get('metric')    ?? 'revenue'
+    const metric2   = searchParams.get('metric2')   ?? null
 
     type Row = { label: string; value: number; value2?: number }
 
@@ -78,8 +93,32 @@ export const GET = withAuth(async (req) => {
       return rev
     }
 
-    function withV2(rows: Row[]): Row[] {
-      return rows
+    /* ── 채널별 월간 추이 (N-series) ──────────────────────── */
+    if (dimension === 'channel_trend') {
+      const orders = await prisma.order.findMany({
+        where: { status: { in: PAID }, orderedAt: dateWhere() },
+        select: { orderedAt: true, totalAmount: true, channel: true }
+      })
+
+      const channels = [...new Set(orders.map(o => o.channel))].sort()
+      const grouped: Record<string, Record<string, number>> = {}
+
+      for (const o of orders) {
+        const month = o.orderedAt.toISOString().substring(0, 7)
+        if (!grouped[month]) grouped[month] = {}
+        const val = metric === 'count' ? 1 : Number(o.totalAmount)
+        grouped[month][o.channel] = (grouped[month][o.channel] ?? 0) + val
+      }
+
+      const rows = Object.entries(grouped)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([label, vals]) => {
+          const row: Record<string, string | number> = { label }
+          for (const ch of channels) row[ch] = vals[ch] ?? 0
+          return row
+        })
+
+      return NextResponse.json({ data: rows, series: channels })
     }
 
     let rawRows: Row[] = []
@@ -87,7 +126,7 @@ export const GET = withAuth(async (req) => {
     if (dimension === 'channel') {
       const rows = await prisma.order.groupBy({
         by: ['channel'],
-        where: { status: { in: PAID }, orderedAt: { gte: periodStart } },
+        where: { status: { in: PAID }, orderedAt: dateWhere() },
         _sum: { totalAmount: true }, _count: { id: true }
       })
       rawRows = rows.map(r => {
@@ -98,7 +137,7 @@ export const GET = withAuth(async (req) => {
       })
     } else if (dimension === 'month') {
       const orders = await prisma.order.findMany({
-        where: { status: { in: PAID } },
+        where: { status: { in: PAID }, orderedAt: dateWhere() },
         select: { orderedAt: true, totalAmount: true },
         orderBy: { orderedAt: 'asc' }
       })
@@ -109,7 +148,7 @@ export const GET = withAuth(async (req) => {
         grouped[key].revenue += Number(o.totalAmount); grouped[key].count++
       }
       rawRows = Object.entries(grouped)
-        .sort(([a], [b]) => a.localeCompare(b)).slice(-12)
+        .sort(([a], [b]) => a.localeCompare(b))
         .map(([label, v]) => {
           const row: Row = { label, value: pickMetric(metric, v.revenue, v.count, 0, 0) }
           if (metric2) row.value2 = pickMetric(metric2, v.revenue, v.count, 0, 0)
@@ -162,8 +201,7 @@ export const GET = withAuth(async (req) => {
       })
     }
 
-    data = withV2(rawRows)
-    return NextResponse.json({ data })
+    return NextResponse.json({ data: rawRows })
   } else if (type === 'voc' && skuId) {
     const reviews = await prisma.vocReview.groupBy({
       by: ['sentiment'],

@@ -14,6 +14,7 @@ export interface ChartConfig {
   metric2Label?: string
   isCurrency: boolean
   isCurrency2?: boolean
+  series?: string[]   // for multi-series dimensions (channel_trend etc.)
 }
 
 export const CHART_COLORS = [
@@ -21,30 +22,35 @@ export const CHART_COLORS = [
   '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16',
 ]
 
+const thisYear = new Date().getFullYear()
 export const PERIODS = [
-  { label: '이번달', value: 'monthly' },
-  { label: '분기',   value: 'quarterly' },
-  { label: '연도',   value: 'yearly' },
+  { label: '이번달',          value: 'monthly' },
+  { label: '분기',            value: 'quarterly' },
+  { label: `${thisYear}년`,   value: `year_${thisYear}` },
+  { label: `${thisYear-1}년`, value: `year_${thisYear - 1}` },
+  { label: `${thisYear-2}년`, value: `year_${thisYear - 2}` },
 ]
 
 export const DIMENSIONS = [
-  { value: 'channel',  label: '매출 채널' },
-  { value: 'month',    label: '월별 추이' },
-  { value: 'segment',  label: '고객 세그먼트' },
-  { value: 'stage',    label: '딜 단계' },
-  { value: 'category', label: '상품 카테고리' },
-  { value: 'reason',   label: '반품 사유' },
-  { value: 'partner',  label: '거래처 정산' },
+  { value: 'channel',       label: '매출 채널' },
+  { value: 'channel_trend', label: '채널별 월간 추이' },
+  { value: 'month',         label: '월별 추이' },
+  { value: 'segment',       label: '고객 세그먼트' },
+  { value: 'stage',         label: '딜 단계' },
+  { value: 'category',      label: '상품 카테고리' },
+  { value: 'reason',        label: '반품 사유' },
+  { value: 'partner',       label: '거래처 정산' },
 ]
 
 export const METRICS_BY_DIM: Record<string, { value: string; label: string; isCurrency: boolean }[]> = {
-  channel:  [{ value: 'revenue', label: '매출액', isCurrency: true  }, { value: 'count', label: '주문 수', isCurrency: false }],
-  month:    [{ value: 'revenue', label: '매출액', isCurrency: true  }, { value: 'count', label: '주문 수', isCurrency: false }],
-  segment:  [{ value: 'count',   label: '고객 수', isCurrency: false }, { value: 'avg_ltv', label: '평균 LTV', isCurrency: true }],
-  stage:    [{ value: 'revenue', label: '딜 금액', isCurrency: true  }, { value: 'count', label: '딜 건수', isCurrency: false }],
-  category: [{ value: 'count',   label: '상품 수', isCurrency: false }],
-  reason:   [{ value: 'count',   label: '건수',   isCurrency: false }, { value: 'refund', label: '환불액', isCurrency: true }],
-  partner:  [{ value: 'revenue', label: '정산액', isCurrency: true  }, { value: 'count', label: '정산 건수', isCurrency: false }],
+  channel:       [{ value: 'revenue', label: '매출액', isCurrency: true  }, { value: 'count', label: '주문 수', isCurrency: false }],
+  channel_trend: [{ value: 'revenue', label: '매출액', isCurrency: true  }, { value: 'count', label: '주문 수', isCurrency: false }],
+  month:         [{ value: 'revenue', label: '매출액', isCurrency: true  }, { value: 'count', label: '주문 수', isCurrency: false }],
+  segment:       [{ value: 'count',   label: '고객 수', isCurrency: false }, { value: 'avg_ltv', label: '평균 LTV', isCurrency: true }],
+  stage:         [{ value: 'revenue', label: '딜 금액', isCurrency: true  }, { value: 'count', label: '딜 건수', isCurrency: false }],
+  category:      [{ value: 'count',   label: '상품 수', isCurrency: false }],
+  reason:        [{ value: 'count',   label: '건수',   isCurrency: false }, { value: 'refund', label: '환불액', isCurrency: true }],
+  partner:       [{ value: 'revenue', label: '정산액', isCurrency: true  }, { value: 'count', label: '정산 건수', isCurrency: false }],
 }
 
 export const CHART_TYPES = [

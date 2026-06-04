@@ -25,12 +25,16 @@ function ChartCard({
   isDragging?: boolean
 }) {
   const [data, setData] = useState<DataPoint[]>([])
+  const [series, setSeries] = useState<string[] | undefined>(config.series)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
     const url = `/api/bi?type=flex&dimension=${config.dimension}&metric=${config.metric}${config.metric2 ? `&metric2=${config.metric2}` : ''}&period=${config.period}`
-    fetch(url).then(r => r.json()).then(d => setData(d.data ?? [])).finally(() => setLoading(false))
+    fetch(url).then(r => r.json()).then(d => {
+      setData(d.data ?? [])
+      if (d.series) setSeries(d.series)
+    }).finally(() => setLoading(false))
   }, [config.dimension, config.metric, config.metric2, config.period])
 
   const isMulti = CHART_TYPES.find(c => c.value === config.chartType)?.multiSeries ?? false
@@ -81,6 +85,7 @@ function ChartCard({
             isCurrency={config.isCurrency} isCurrency2={config.isCurrency2}
             label1={config.metricLabel} label2={config.metric2Label ?? '값2'}
             height={chartH}
+            series={series}
           />
         )}
       </div>

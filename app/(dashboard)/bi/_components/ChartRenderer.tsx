@@ -8,7 +8,12 @@ import {
 import { formatKRW } from '@/lib/utils'
 import { CHART_COLORS } from './chartTypes'
 
-export interface DataPoint { label: string; value: number; value2?: number }
+export interface DataPoint {
+  label: string
+  value: number
+  value2?: number
+  [key: string]: string | number | undefined
+}
 
 interface Props {
   data: DataPoint[]
@@ -18,6 +23,7 @@ interface Props {
   label1?: string
   label2?: string
   height?: number
+  series?: string[]   // for N-series charts (channel_trend etc.)
 }
 
 function mkTick(isCur: boolean) {
@@ -31,6 +37,7 @@ export function ChartRenderer({
   isCurrency = false, isCurrency2 = false,
   label1 = '값1', label2 = '값2',
   height = 300,
+  series,
 }: Props) {
   const fmt1 = (v: number) => isCurrency  ? formatKRW(v) : v.toLocaleString()
   const fmt2 = (v: number) => isCurrency2 ? formatKRW(v) : v.toLocaleString()
@@ -42,6 +49,34 @@ export function ChartRenderer({
     return [s === 'value' ? fmt1(n) : fmt2(n), s === 'value' ? label1 : label2]
   }
   const lgFmt = (v: string) => v === 'value' ? label1 : label2
+
+  /* ── N-Series Line (channel_trend) ─────────────────────────── */
+  if (series && series.length > 0) {
+    const tickFmt = mkTick(isCurrency)
+    const tooltipFmt = (v: unknown) => isCurrency ? formatKRW(Number(v)) : Number(v).toLocaleString()
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 11 }} tickFormatter={tickFmt} />
+          <Tooltip formatter={tooltipFmt} />
+          <Legend />
+          {series.map((key, i) => (
+            <Line
+              key={key}
+              type="monotone"
+              dataKey={key}
+              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              name={key}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    )
+  }
 
   /* ── Pie / Donut ───────────────────────────────────────────── */
   if (chartType === 'pie' || chartType === 'donut') {
