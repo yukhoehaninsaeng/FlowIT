@@ -121,7 +121,7 @@ export const GET = withAuth(async (req) => {
       })
       rawRows = rows.map(r => {
         const cnt = r._count.id, avgLtv = Number(r._avg.ltv ?? 0)
-        const row: Row = { label: r.segment, value: pickMetric(metric, 0, cnt, avgLtv, 0) }
+        const row: Row = { label: r.segment ?? '', value: pickMetric(metric, 0, cnt, avgLtv, 0) }
         if (metric2) row.value2 = pickMetric(metric2, 0, cnt, avgLtv, 0)
         return row
       })
