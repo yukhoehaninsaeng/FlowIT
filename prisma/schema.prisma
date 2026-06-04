@@ -885,3 +885,14 @@ model BiCache {
 
   @@map("bi_cache")
 }
+
+
+model UserBiDashboard {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @unique @map("user_id") @db.Uuid
+  charts    Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("user_bi_dashboards")
+}

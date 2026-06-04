@@ -153,17 +153,18 @@ export function ChartRenderer({
 
   /* ── Pie / Donut ───────────────────────────────────────────── */
   if (chartType === 'pie' || chartType === 'donut') {
-    const total = data.reduce((s, d) => s + d.value, 0)
+    const RMIN_LABEL = 5
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="50%"
             outerRadius={height * 0.32} innerRadius={chartType === 'donut' ? height * 0.17 : 0}
-            label={({ name, value }) => `${name} (${total > 0 ? Math.round(value / total * 100) : 0}%)`} labelLine>
+            label={({ percent }) => (percent ?? 0) * 100 >= RMIN_LABEL ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''}
+            labelLine={(percent: number) => (percent ?? 0) * 100 >= RMIN_LABEL}>
             {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
           </Pie>
-          <Tooltip formatter={(v: unknown) => fmt1(Number(v))} />
-          <Legend />
+          <Tooltip formatter={(v: unknown, name: unknown) => [fmt1(Number(v)), String(name)]} />
+          <Legend formatter={(v: string) => v} wrapperStyle={{ fontSize: 12 }} />
         </PieChart>
       </ResponsiveContainer>
     )

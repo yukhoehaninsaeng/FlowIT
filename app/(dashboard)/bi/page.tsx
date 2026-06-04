@@ -13,12 +13,29 @@ import type { ChartConfig } from './_components/chartTypes'
 import { CHART_COLORS, CHART_STORAGE_KEY, PERIODS } from './_components/chartTypes'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function loadCharts(): ChartConfig[] {
+function loadLocalCharts(): ChartConfig[] {
   if (typeof window === 'undefined') return []
   try { return JSON.parse(localStorage.getItem(CHART_STORAGE_KEY) ?? '[]') } catch { return [] }
 }
-function saveCharts(charts: ChartConfig[]) {
+function saveLocalCharts(charts: ChartConfig[]) {
   try { localStorage.setItem(CHART_STORAGE_KEY, JSON.stringify(charts)) } catch { /* ignore */ }
+}
+async function fetchDbCharts(): Promise<ChartConfig[]> {
+  try {
+    const r = await fetch('/api/bi/dashboard')
+    if (!r.ok) return []
+    const d = await r.json()
+    return Array.isArray(d.charts) ? (d.charts as ChartConfig[]) : []
+  } catch { return [] }
+}
+async function persistDbCharts(charts: ChartConfig[]) {
+  try {
+    await fetch('/api/bi/dashboard', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ charts }),
+    })
+  } catch { /* ignore */ }
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
@@ -219,19 +236,30 @@ export default function BiPage() {
   const [charts, setCharts]     = useState<ChartConfig[]>([])
   const [dashBadge, setDashBadge] = useState(0)
 
-  useEffect(() => { setCharts(loadCharts()) }, [])
+  useEffect(() => {
+    fetchDbCharts().then(dbCharts => {
+      if (dbCharts.length > 0) {
+        setCharts(dbCharts)
+        saveLocalCharts(dbCharts)
+      } else {
+        setCharts(loadLocalCharts())
+      }
+    })
+  }, [])
 
   function handleAddToDashboard(config: ChartConfig) {
     const next = [...charts, config]
     setCharts(next)
-    saveCharts(next)
+    saveLocalCharts(next)
+    persistDbCharts(next)
     setDashBadge(b => b + 1)
     setActiveTab('dashboard')
   }
 
   function handleUpdateCharts(next: ChartConfig[]) {
     setCharts(next)
-    saveCharts(next)
+    saveLocalCharts(next)
+    persistDbCharts(next)
   }
 
   const TABS = [
