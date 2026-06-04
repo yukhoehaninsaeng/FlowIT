@@ -66,7 +66,23 @@ export const GET = withAuth(async (req) => {
     data = { expiringSkus: expiring }
   } else if (type === 'flex') {
     const dimension = searchParams.get('dimension') ?? 'channel'
-    const metric = searchParams.get('metric') ?? 'revenue'
+    const metric    = searchParams.get('metric')  ?? 'revenue'
+    const metric2   = searchParams.get('metric2') ?? null
+
+    type Row = { label: string; value: number; value2?: number }
+
+    function pickMetric(m: string, rev: number, cnt: number, avgLtv: number, refund: number): number {
+      if (m === 'count')   return cnt
+      if (m === 'avg_ltv') return avgLtv
+      if (m === 'refund')  return refund
+      return rev
+    }
+
+    function withV2(rows: Row[]): Row[] {
+      return rows
+    }
+
+    let rawRows: Row[] = []
 
     if (dimension === 'channel') {
       const rows = await prisma.order.groupBy({
@@ -74,7 +90,12 @@ export const GET = withAuth(async (req) => {
         where: { status: { in: PAID }, orderedAt: { gte: periodStart } },
         _sum: { totalAmount: true }, _count: { id: true }
       })
-      data = rows.map(r => ({ label: r.channel, value: metric === 'count' ? r._count.id : Number(r._sum.totalAmount ?? 0) }))
+      rawRows = rows.map(r => {
+        const rev = Number(r._sum.totalAmount ?? 0), cnt = r._count.id
+        const row: Row = { label: r.channel, value: pickMetric(metric, rev, cnt, 0, 0) }
+        if (metric2) row.value2 = pickMetric(metric2, rev, cnt, 0, 0)
+        return row
+      })
     } else if (dimension === 'month') {
       const orders = await prisma.order.findMany({
         where: { status: { in: PAID } },
@@ -87,43 +108,61 @@ export const GET = withAuth(async (req) => {
         if (!grouped[key]) grouped[key] = { revenue: 0, count: 0 }
         grouped[key].revenue += Number(o.totalAmount); grouped[key].count++
       }
-      data = Object.entries(grouped)
-        .map(([label, v]) => ({ label, value: metric === 'count' ? v.count : v.revenue }))
-        .sort((a, b) => a.label.localeCompare(b.label)).slice(-12)
+      rawRows = Object.entries(grouped)
+        .sort(([a], [b]) => a.localeCompare(b)).slice(-12)
+        .map(([label, v]) => {
+          const row: Row = { label, value: pickMetric(metric, v.revenue, v.count, 0, 0) }
+          if (metric2) row.value2 = pickMetric(metric2, v.revenue, v.count, 0, 0)
+          return row
+        })
     } else if (dimension === 'segment') {
       const rows = await prisma.customer.groupBy({
         by: ['segment'], _count: { id: true }, _avg: { ltv: true }
       })
-      data = rows.map(r => ({ label: r.segment, value: metric === 'avg_ltv' ? Number(r._avg.ltv ?? 0) : r._count.id }))
+      rawRows = rows.map(r => {
+        const cnt = r._count.id, avgLtv = Number(r._avg.ltv ?? 0)
+        const row: Row = { label: r.segment, value: pickMetric(metric, 0, cnt, avgLtv, 0) }
+        if (metric2) row.value2 = pickMetric(metric2, 0, cnt, avgLtv, 0)
+        return row
+      })
     } else if (dimension === 'stage') {
       const rows = await prisma.deal.groupBy({
         by: ['stage'], _count: { id: true }, _sum: { amount: true }
       })
-      data = rows.map(r => ({ label: r.stage, value: metric === 'count' ? r._count.id : Number(r._sum.amount ?? 0) }))
+      rawRows = rows.map(r => {
+        const rev = Number(r._sum.amount ?? 0), cnt = r._count.id
+        const row: Row = { label: r.stage, value: pickMetric(metric, rev, cnt, 0, 0) }
+        if (metric2) row.value2 = pickMetric(metric2, rev, cnt, 0, 0)
+        return row
+      })
     } else if (dimension === 'category') {
       const rows = await prisma.skuMaster.groupBy({
         by: ['category'], where: { isActive: true }, _count: { id: true }
       })
-      data = rows.map(r => ({ label: r.category, value: r._count.id }))
+      rawRows = rows.map(r => ({ label: r.category, value: r._count.id }))
     } else if (dimension === 'reason') {
       const rows = await prisma.return.groupBy({
         by: ['reason'], _count: { id: true }, _sum: { refundAmount: true }
       })
-      data = rows.filter(r => r.reason).map(r => ({
-        label: r.reason!,
-        value: metric === 'refund' ? Number(r._sum.refundAmount ?? 0) : r._count.id
-      }))
+      rawRows = rows.filter(r => r.reason).map(r => {
+        const cnt = r._count.id, refund = Number(r._sum.refundAmount ?? 0)
+        const row: Row = { label: r.reason!, value: pickMetric(metric, 0, cnt, 0, refund) }
+        if (metric2) row.value2 = pickMetric(metric2, 0, cnt, 0, refund)
+        return row
+      })
     } else if (dimension === 'partner') {
       const rows = await prisma.settlement.groupBy({
         by: ['partnerName'], _count: { id: true }, _sum: { totalAmount: true }
       })
-      data = rows.filter(r => r.partnerName).map(r => ({
-        label: r.partnerName!,
-        value: metric === 'count' ? r._count.id : Number(r._sum.totalAmount ?? 0)
-      }))
-    } else {
-      data = []
+      rawRows = rows.filter(r => r.partnerName).map(r => {
+        const rev = Number(r._sum.totalAmount ?? 0), cnt = r._count.id
+        const row: Row = { label: r.partnerName!, value: pickMetric(metric, rev, cnt, 0, 0) }
+        if (metric2) row.value2 = pickMetric(metric2, rev, cnt, 0, 0)
+        return row
+      })
     }
+
+    data = withV2(rawRows)
     return NextResponse.json({ data })
   } else if (type === 'voc' && skuId) {
     const reviews = await prisma.vocReview.groupBy({
