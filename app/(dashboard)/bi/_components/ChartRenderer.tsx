@@ -7,7 +7,20 @@ import {
   FunnelChart, Funnel, LabelList, Treemap, RadialBarChart, RadialBar, PolarAngleAxis,
 } from 'recharts'
 import { formatKRW } from '@/lib/utils'
-import { CHART_COLORS } from './chartTypes'
+import { CHART_COLORS, getChannelColor } from './chartTypes'
+
+// Rule 12: 숫자 단위 축약 (라벨용)
+function fmtLabel(v: number, isCur: boolean): string {
+  if (isCur) {
+    if (v >= 1e8) return `${(v / 1e8).toFixed(1)}억`
+    if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`
+    if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`
+    return v.toLocaleString()
+  }
+  if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`
+  if (v >= 1e3) return `${(v / 1e3).toFixed(0)}K`
+  return v.toLocaleString()
+}
 
 export interface DataPoint {
   label: string
@@ -50,7 +63,7 @@ export function ChartRenderer({
   }
   const lgFmt = (v: string) => v === 'value' ? label1 : v === 'value2' ? label2 : v
 
-  /* ── N-Series Line (channel_trend) ─────────────────────────── */
+  /* ── N-Series Line (channel_trend) — Rule 11 채널 고정 색상 ── */
   if (series && series.length > 0) {
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -61,7 +74,9 @@ export function ChartRenderer({
           <Tooltip formatter={(v: unknown, name: unknown) => [isCurrency ? formatKRW(Number(v)) : Number(v).toLocaleString(), String(name)]} />
           <Legend />
           {series.map((key, i) => (
-            <Line key={key} type="monotone" dataKey={key} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2} dot={{ r: 3 }} name={key} />
+            <Line key={key} type="monotone" dataKey={key}
+              stroke={getChannelColor(key, i)}
+              strokeWidth={2} dot={{ r: 3 }} name={key} />
           ))}
         </LineChart>
       </ResponsiveContainer>
@@ -172,15 +187,21 @@ export function ChartRenderer({
 
   /* ── Horizontal Bar ────────────────────────────────────────── */
   if (chartType === 'bar_h') {
+    const showLbl = data.length <= 10
     return (
-      <ResponsiveContainer width="100%" height={Math.max(height, data.length * 32 + 40)}>
-        <BarChart data={data} layout="vertical">
+      <ResponsiveContainer width="100%" height={Math.max(height, data.length * 36 + 40)}>
+        <BarChart data={data} layout="vertical" margin={{ right: showLbl ? 52 : 16 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={tf1} />
-          <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={100} />
+          <YAxis type="category" dataKey="label" tick={{ fontSize: 11 }} width={110} />
           <Tooltip formatter={(v: unknown) => fmt1(Number(v))} />
           <Bar dataKey="value" radius={[0, 4, 4, 0]}>
             {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+            {showLbl && (
+              <LabelList dataKey="value" position="right"
+                style={{ fontSize: 10, fill: '#6b7280' }}
+                formatter={(v: unknown) => fmtLabel(Number(v), isCurrency)} />
+            )}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -295,7 +316,8 @@ export function ChartRenderer({
     )
   }
 
-  /* ── Bar (default) ─────────────────────────────────────────── */
+  /* ── Bar (default) ── Rule 12: 10개 이하 값 라벨 표시 ─────── */
+  const showBarLbl = data.length <= 10
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data}>
@@ -305,6 +327,11 @@ export function ChartRenderer({
         <Tooltip formatter={(v: unknown) => fmt1(Number(v))} />
         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
           {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+          {showBarLbl && (
+            <LabelList dataKey="value" position="top"
+              style={{ fontSize: 10, fill: '#6b7280' }}
+              formatter={(v: unknown) => fmtLabel(Number(v), isCurrency)} />
+          )}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
