@@ -160,7 +160,7 @@ export function ChartRenderer({
           <Pie data={data} dataKey="value" nameKey="label" cx="50%" cy="50%"
             outerRadius={height * 0.32} innerRadius={chartType === 'donut' ? height * 0.17 : 0}
             label={({ percent }) => (percent ?? 0) * 100 >= RMIN_LABEL ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''}
-            labelLine={(percent: number) => (percent ?? 0) * 100 >= RMIN_LABEL}>
+            labelLine={false}>
             {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
           </Pie>
           <Tooltip formatter={(v: unknown, name: unknown) => [fmt1(Number(v)), String(name)]} />
