@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Search, RotateCcw, X, Loader2 } from 'lucide-react'
+import { SearchInput } from '@/components/ui/SearchInput'
 
 interface Return {
   id: string; returnNo: string; status: string; reason: string | null
   refundAmount: string | null; itemCount: number; createdAt: string
 }
+
+interface ReturnItem { skuCode: string; skuName: string; qty: number }
+interface Sku { id: string; skuCode: string; name: string; unit: string | null }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   requested:  { label: '접수', color: 'bg-yellow-100 text-yellow-700' },
@@ -19,6 +23,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 const REASONS = ['단순 변심', '불량·파손', '오배송', '유통기한', '기타']
 
+async function fetchSkus(q: string): Promise<Sku[]> {
+  const r = await fetch(`/api/sku?search=${encodeURIComponent(q)}&limit=8`)
+  const d = await r.json()
+  return d.data ?? []
+}
+
 export default function ReturnsPage() {
   const [returns, setReturns] = useState<Return[]>([])
   const [loading, setLoading] = useState(true)
@@ -26,7 +36,7 @@ export default function ReturnsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ reason: '', notes: '', refundAmount: '' })
-  const [items, setItems] = useState([{ name: '', qty: 1 }])
+  const [items, setItems] = useState<ReturnItem[]>([{ skuCode: '', skuName: '', qty: 1 }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -48,13 +58,15 @@ export default function ReturnsPage() {
           reason: form.reason,
           notes: form.notes || null,
           refundAmount: form.refundAmount ? Number(form.refundAmount) : null,
-          items: items.filter(i => i.name.trim()).map(i => ({ name: i.name, qty: i.qty })),
+          items: items
+            .filter(i => i.skuName.trim() || i.skuCode.trim())
+            .map(({ skuCode, skuName, qty }) => ({ skuCode, skuName, qty })),
         }),
       })
       if (!r.ok) { const d = await r.json(); setError(d.error ?? '등록 실패'); return }
       setShowModal(false)
       setForm({ reason: '', notes: '', refundAmount: '' })
-      setItems([{ name: '', qty: 1 }])
+      setItems([{ skuCode: '', skuName: '', qty: 1 }])
       load()
     } finally { setSaving(false) }
   }
@@ -171,16 +183,41 @@ export default function ReturnsPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-gray-500">반품 품목</label>
-                  <button onClick={() => setItems(p => [...p, { name: '', qty: 1 }])} className="text-xs text-blue-600">+ 추가</button>
+                  <button
+                    onClick={() => setItems(p => [...p, { skuCode: '', skuName: '', qty: 1 }])}
+                    className="text-xs text-blue-600"
+                  >
+                    + 추가
+                  </button>
                 </div>
                 <div className="space-y-2">
                   {items.map((item, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <input value={item.name} onChange={e => setItems(p => p.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                        placeholder="품목명" className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                      <input type="number" min={1} value={item.qty} onChange={e => setItems(p => p.map((x, i) => i === idx ? { ...x, qty: Number(e.target.value) } : x))}
-                        className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-right" />
-                      <button onClick={() => setItems(p => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 px-1">✕</button>
+                    <div key={idx} className="flex gap-2 items-start">
+                      <div className="flex-1">
+                        <SearchInput<Sku>
+                          value={item.skuName}
+                          onInputChange={v => setItems(p => p.map((x, i) => i === idx ? { ...x, skuName: v, skuCode: '' } : x))}
+                          onSelect={sku => setItems(p => p.map((x, i) => i === idx ? { ...x, skuCode: sku.skuCode, skuName: sku.name } : x))}
+                          fetchOptions={fetchSkus}
+                          placeholder="품목명 또는 SKU 검색"
+                          renderOption={sku => (
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-gray-400">{sku.skuCode}</span>
+                              <span className="text-gray-900">{sku.name}</span>
+                              {sku.unit && <span className="text-xs text-gray-400">/{sku.unit}</span>}
+                            </div>
+                          )}
+                        />
+                        {item.skuCode && (
+                          <div className="mt-0.5 text-xs text-gray-400 font-mono pl-1">{item.skuCode}</div>
+                        )}
+                      </div>
+                      <input
+                        type="number" min={1} value={item.qty}
+                        onChange={e => setItems(p => p.map((x, i) => i === idx ? { ...x, qty: Number(e.target.value) } : x))}
+                        className="w-20 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 text-right"
+                      />
+                      <button onClick={() => setItems(p => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 px-1 py-2">✕</button>
                     </div>
                   ))}
                 </div>

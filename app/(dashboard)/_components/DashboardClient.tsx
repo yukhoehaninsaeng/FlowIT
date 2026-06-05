@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatKRW, cn } from '@/lib/utils'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { TrendingUp, Users, CreditCard, AlertCircle, Settings, Eye, EyeOff, GripVertical, CheckCircle } from 'lucide-react'
+import { TrendingUp, Users, CreditCard, AlertCircle, Settings, Eye, EyeOff, GripVertical, CheckCircle, BarChart2 } from 'lucide-react'
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useModules } from '@/lib/hooks/useModules'
 import { MODULE_REGISTRY, CATEGORY_LABELS, type ModuleCategory } from '@/lib/modules/registry'
 import { usePathname } from 'next/navigation'
+import { ChartRenderer } from '@/app/(dashboard)/bi/_components/ChartRenderer'
+import type { ChartConfig } from '@/app/(dashboard)/bi/_components/chartTypes'
+import { HEIGHT_PX, COL_SPAN_CLASSES } from '@/app/(dashboard)/bi/_components/chartTypes'
 
 // ── 위젯 정의 ──────────────────────────────────────────────────
 const WIDGET_DEFS = [
@@ -19,6 +22,7 @@ const WIDGET_DEFS = [
   { id: 'sales_chart',     label: '채널별 매출',     description: '채널 분포 차트' },
   { id: 'segment_chart',   label: '고객 세그먼트',   description: '세그먼트 현황' },
   { id: 'recent_activity', label: '최근 활동',       description: '시스템 활동 로그' },
+  { id: 'bi_charts',       label: 'BI 차트',         description: 'BI 대시보드에서 만든 차트' },
 ]
 
 type WidgetConfig = { id: string; enabled: boolean }
@@ -305,6 +309,7 @@ export default function DashboardClient() {
                 ) : <EmptyState message="활동 내역이 없습니다" />}
               </div>
             )
+            case 'bi_charts': return <BiChartsWidget key="bi_charts" />
             default: return null
           }
         })}
@@ -362,4 +367,87 @@ function SegmentCard({ label, count, color }: { label: string; count: number; co
 
 function EmptyState({ message }: { message: string }) {
   return <div className="flex items-center justify-center h-28 text-sm text-gray-400">{message}</div>
+}
+
+// ── BI 차트 위젯 ────────────────────────────────────────────────
+function BiChartsWidget() {
+  const [charts, setCharts] = useState<ChartConfig[]>([])
+  const [data, setData] = useState<Record<string, { data: unknown[]; series?: string[] }>>({})
+
+  useEffect(() => {
+    fetch('/api/bi/dashboard')
+      .then(r => r.json())
+      .then(d => {
+        const loaded: ChartConfig[] = Array.isArray(d.charts) ? d.charts : []
+        setCharts(loaded)
+        loaded.forEach(cfg => {
+          const m2 = cfg.metric2 ? `&metric2=${cfg.metric2}` : ''
+          const lim = cfg.limit ? `&limit=${cfg.limit}` : ''
+          fetch(`/api/bi?type=flex&dimension=${cfg.dimension}&metric=${cfg.metric}${m2}&period=${cfg.period}${lim}`)
+            .then(r => r.json())
+            .then(d => setData(prev => ({ ...prev, [cfg.id]: { data: d.data ?? [], series: d.series } })))
+            .catch(() => {/* ignore */})
+        })
+      })
+      .catch(() => {/* ignore */})
+  }, [])
+
+  if (charts.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <BarChart2 size={15} className="text-blue-600" /> BI 차트
+          </h2>
+          <Link href="/bi" className="text-xs text-blue-600 hover:underline">차트 만들기 →</Link>
+        </div>
+        <EmptyState message="BI 대시보드에서 차트를 추가하면 여기에 표시됩니다" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+          <BarChart2 size={15} className="text-blue-600" /> BI 차트
+        </h2>
+        <Link href="/bi" className="text-xs text-blue-600 hover:underline">편집 →</Link>
+      </div>
+      <div className="grid grid-cols-12 gap-4">
+        {charts.slice(0, 4).map(cfg => {
+          const entry = data[cfg.id]
+          const chartData = entry?.data ?? []
+          const series   = entry?.series
+          const hpx = HEIGHT_PX[cfg.height] ?? 300
+          return (
+            <div key={cfg.id} className={`${COL_SPAN_CLASSES[cfg.colSpan] ?? 'col-span-6'} min-w-0`}>
+              {cfg.title && <p className="text-xs font-medium text-gray-600 mb-1 truncate">{cfg.title}</p>}
+              {chartData.length > 0 ? (
+                <ChartRenderer
+                  data={chartData as Parameters<typeof ChartRenderer>[0]['data']}
+                  chartType={cfg.chartType}
+                  isCurrency={cfg.isCurrency}
+                  isCurrency2={cfg.isCurrency2}
+                  label1={cfg.metricLabel}
+                  label2={cfg.metric2Label}
+                  height={hpx}
+                  series={series}
+                />
+              ) : (
+                <div style={{ height: hpx }} className="flex items-center justify-center text-xs text-gray-300">
+                  불러오는 중…
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {charts.length > 4 && (
+        <p className="text-xs text-gray-400 text-center mt-3">
+          +{charts.length - 4}개 차트 더 있음 · <Link href="/bi" className="text-blue-500 hover:underline">BI 대시보드에서 보기</Link>
+        </p>
+      )}
+    </div>
+  )
 }

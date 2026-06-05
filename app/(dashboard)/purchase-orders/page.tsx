@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Search, FileText, Loader2, X } from 'lucide-react'
+import { SearchInput } from '@/components/ui/SearchInput'
 
 interface PO {
   id: string; orderNo: string; type: 'purchase' | 'sales'
   partnerName: string | null; status: string
   totalAmount: string | null; dueDate: string | null; createdAt: string
 }
-interface POItem { name: string; qty: number; unitPrice: number; total: number }
+interface POItem { skuCode: string; skuName: string; qty: number; unitPrice: number; total: number }
+interface Account { id: string; name: string; contactName: string | null; contactPhone: string | null; address: string | null }
+interface Sku { id: string; skuCode: string; name: string; unitCost: number | null; sellingPrice: number | null; unit: string | null }
 
 const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   draft:     { label: '초안', color: 'bg-gray-100 text-gray-600' },
@@ -16,6 +19,18 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
   shipped:   { label: '출고', color: 'bg-orange-100 text-orange-700' },
   completed: { label: '완료', color: 'bg-green-100 text-green-700' },
   cancelled: { label: '취소', color: 'bg-red-100 text-red-700' },
+}
+
+async function fetchAccounts(q: string): Promise<Account[]> {
+  const r = await fetch(`/api/accounts?q=${encodeURIComponent(q)}`)
+  const d = await r.json()
+  return (d.accounts ?? []).slice(0, 8)
+}
+
+async function fetchSkus(q: string): Promise<Sku[]> {
+  const r = await fetch(`/api/sku?search=${encodeURIComponent(q)}&limit=8`)
+  const d = await r.json()
+  return d.data ?? []
 }
 
 export default function PurchaseOrdersPage() {
@@ -26,8 +41,8 @@ export default function PurchaseOrdersPage() {
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [form, setForm] = useState({ partnerName: '', dueDate: '', notes: '' })
-  const [items, setItems] = useState<POItem[]>([{ name: '', qty: 1, unitPrice: 0, total: 0 }])
+  const [form, setForm] = useState({ partnerName: '', partnerId: '', dueDate: '', notes: '' })
+  const [items, setItems] = useState<POItem[]>([{ skuCode: '', skuName: '', qty: 1, unitPrice: 0, total: 0 }])
 
   const load = () =>
     fetch('/api/purchase-orders').then(r => r.ok ? r.json() : { orders: [] })
@@ -55,16 +70,22 @@ export default function PurchaseOrdersPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: tab, partnerName: form.partnerName, status: 'draft', totalAmount,
+          type: tab,
+          partnerName: form.partnerName,
+          partnerId: form.partnerId || null,
+          status: 'draft',
+          totalAmount,
           dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
           notes: form.notes || null,
-          items: items.filter(i => i.name.trim()),
+          items: items
+            .filter(i => i.skuName.trim() || i.skuCode.trim())
+            .map(({ skuCode, skuName, qty, unitPrice }) => ({ skuCode, skuName, qty, unitPrice })),
         }),
       })
       if (!r.ok) { const d = await r.json(); setError(d.error ?? '등록 실패'); return }
       setShowModal(false)
-      setForm({ partnerName: '', dueDate: '', notes: '' })
-      setItems([{ name: '', qty: 1, unitPrice: 0, total: 0 }])
+      setForm({ partnerName: '', partnerId: '', dueDate: '', notes: '' })
+      setItems([{ skuCode: '', skuName: '', qty: 1, unitPrice: 0, total: 0 }])
       load()
     } finally { setSaving(false) }
   }
@@ -144,10 +165,25 @@ export default function PurchaseOrdersPage() {
               {error && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">{error}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs text-gray-500 mb-1">거래처명 *</label>
-                  <input value={form.partnerName} onChange={e => setForm(p => ({ ...p, partnerName: e.target.value }))}
-                    placeholder="(주)샘플컴퍼니"
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <label className="block text-xs text-gray-500 mb-1">거래처 *</label>
+                  <SearchInput<Account>
+                    value={form.partnerName}
+                    onInputChange={v => setForm(p => ({ ...p, partnerName: v, partnerId: '' }))}
+                    onSelect={acc => setForm(p => ({ ...p, partnerName: acc.name, partnerId: acc.id }))}
+                    fetchOptions={fetchAccounts}
+                    placeholder="거래처명 검색..."
+                    renderOption={acc => (
+                      <div>
+                        <span className="font-medium text-gray-900">{acc.name}</span>
+                        {acc.contactName && (
+                          <span className="text-xs text-gray-400 ml-2">{acc.contactName}</span>
+                        )}
+                        {acc.contactPhone && (
+                          <span className="text-xs text-gray-400 ml-2">{acc.contactPhone}</span>
+                        )}
+                      </div>
+                    )}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">납기일</label>
@@ -163,8 +199,12 @@ export default function PurchaseOrdersPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-medium text-gray-500">품목</label>
-                  <button onClick={() => setItems(p => [...p, { name: '', qty: 1, unitPrice: 0, total: 0 }])}
-                    className="text-xs text-blue-600 hover:text-blue-800">+ 품목 추가</button>
+                  <button
+                    onClick={() => setItems(p => [...p, { skuCode: '', skuName: '', qty: 1, unitPrice: 0, total: 0 }])}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    + 품목 추가
+                  </button>
                 </div>
                 <div className="border border-gray-200 rounded-md overflow-hidden">
                   <table className="w-full text-xs">
@@ -181,8 +221,32 @@ export default function PurchaseOrdersPage() {
                       {items.map((item, idx) => (
                         <tr key={idx}>
                           <td className="px-2 py-1.5">
-                            <input value={item.name} onChange={e => recalcItem(idx, 'name', e.target.value)}
-                              placeholder="품목명" className="w-full px-2 py-1 border border-gray-200 rounded text-xs" />
+                            <SearchInput<Sku>
+                              value={item.skuName}
+                              onInputChange={v => recalcItem(idx, 'skuName', v)}
+                              onSelect={sku => {
+                                const price = tab === 'purchase'
+                                  ? (Number(sku.unitCost) || 0)
+                                  : (Number(sku.sellingPrice) || 0)
+                                setItems(prev => {
+                                  const next = [...prev]
+                                  next[idx] = { ...next[idx], skuCode: sku.skuCode, skuName: sku.name, unitPrice: price, total: next[idx].qty * price }
+                                  return next
+                                })
+                              }}
+                              fetchOptions={fetchSkus}
+                              placeholder="품목명 또는 SKU 검색"
+                              renderOption={sku => (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs text-gray-400">{sku.skuCode}</span>
+                                  <span className="text-gray-900">{sku.name}</span>
+                                  {sku.unit && <span className="text-xs text-gray-400">/{sku.unit}</span>}
+                                </div>
+                              )}
+                            />
+                            {item.skuCode && (
+                              <div className="mt-0.5 text-xs text-gray-400 font-mono pl-1">{item.skuCode}</div>
+                            )}
                           </td>
                           <td className="px-2 py-1.5">
                             <input type="number" min={1} value={item.qty} onChange={e => recalcItem(idx, 'qty', Number(e.target.value))}
