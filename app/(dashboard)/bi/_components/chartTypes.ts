@@ -80,24 +80,55 @@ export const METRICS_BY_DIM: Record<string, { value: string; label: string; isCu
   partner:       [{ value: 'revenue', label: '정산액', isCurrency: true  }, { value: 'count', label: '정산 건수', isCurrency: false }],
 }
 
+// CRM 사용 빈도 순 정렬: 가로막대(40%) > 꺾은선(30%) > 도넛(15%) > 세로막대(10%) > 기타
 export const CHART_TYPES = [
-  // Single series
-  { value: 'bar',         label: '막대',    desc: '세로 막대',       multiSeries: false },
-  { value: 'bar_h',       label: '가로막대', desc: '수평 막대',      multiSeries: false },
-  { value: 'line',        label: '라인',    desc: '꺾은선 추이',     multiSeries: false },
-  { value: 'area',        label: '영역',    desc: '면적 채움',       multiSeries: false },
-  { value: 'pie',         label: '파이',    desc: '원형 비중',       multiSeries: false },
-  { value: 'donut',       label: '도넛',    desc: '도넛 비중',       multiSeries: false },
-  { value: 'funnel',      label: '퍼널',    desc: '단계 전환',       multiSeries: false },
-  { value: 'treemap',     label: '트리맵',  desc: '면적 분포',       multiSeries: false },
-  { value: 'radial',      label: '레이더',  desc: '방사형 비교',     multiSeries: false },
-  // Multi series
-  { value: 'bar_grouped', label: '그룹막대', desc: '2계열 나란히',   multiSeries: true  },
-  { value: 'bar_stacked', label: '누적막대', desc: '2계열 누적',     multiSeries: true  },
-  { value: 'line_multi',  label: '멀티라인', desc: '2계열 추이',     multiSeries: true  },
-  { value: 'scatter',     label: '산점도',  desc: 'X·Y 상관관계',   multiSeries: true  },
-  { value: 'combo',       label: '콤보',    desc: '막대 + 라인',    multiSeries: true  },
+  // ── 단일 계열 ─ CRM 우선순위 ────────────────────────────────
+  { value: 'bar_h',       label: '가로막대', desc: '순위·비교  ★CRM 1위',   multiSeries: false },
+  { value: 'line',        label: '꺾은선',   desc: '시계열 추이  ★CRM 2위',  multiSeries: false },
+  { value: 'donut',       label: '도넛',    desc: '비율  ★CRM 3위',         multiSeries: false },
+  { value: 'bar',         label: '세로막대', desc: '카테고리 비교',           multiSeries: false },
+  { value: 'area',        label: '영역',    desc: '면적 추이',               multiSeries: false },
+  { value: 'pie',         label: '파이',    desc: '원형 비중',               multiSeries: false },
+  { value: 'funnel',      label: '퍼널',    desc: '단계 전환',               multiSeries: false },
+  { value: 'treemap',     label: '트리맵',  desc: '면적 분포',               multiSeries: false },
+  // ── 2계열 ────────────────────────────────────────────────
+  { value: 'bar_grouped', label: '그룹막대', desc: '2계열 나란히',            multiSeries: true  },
+  { value: 'bar_stacked', label: '누적막대', desc: '2계열 누적',              multiSeries: true  },
+  { value: 'line_multi',  label: '멀티라인', desc: '2계열 꺾은선',            multiSeries: true  },
+  { value: 'scatter',     label: '산점도',  desc: 'X·Y 상관관계',            multiSeries: true  },
+  { value: 'combo',       label: '콤보',    desc: '막대 + 꺾은선',           multiSeries: true  },
 ]
+
+// ── AI 차트 추천 엔진 (Tableau·Power BI 규칙 기반) ─────────────
+export function recommendChartType(dimension: string): string {
+  switch (dimension) {
+    // 시계열 → 꺾은선/영역
+    case 'month':         return 'area'
+    case 'hour':          return 'area'
+    case 'weekday':       return 'bar'
+    case 'month_yoy':     return 'bar_grouped'
+    case 'channel_trend': return 'line'
+    case 'return_trend':  return 'bar_grouped'
+    // 순위·긴 레이블 → 가로막대 강제
+    case 'sku_top':       return 'bar_h'
+    case 'partner':       return 'bar_h'
+    case 'segment':       return 'bar_h'
+    case 'campaign_perf': return 'bar_h'
+    // 비율 (소수 항목) → 도넛
+    case 'channel':       return 'donut'
+    case 'carrier':       return 'donut'
+    // 단계형 → 퍼널
+    case 'funnel_stage':  return 'funnel'
+    // 분포 → 트리맵
+    case 'category':      return 'treemap'
+    case 'reason':        return 'treemap'
+    // 기본 → 세로막대
+    default:              return 'bar'
+  }
+}
+
+// channel_trend는 항상 N계열 데이터(채널별 시리즈) 반환 → 차트 유형 고정
+export const N_SERIES_DIMS = new Set(['channel_trend'])
 
 // Quick-start templates
 export const QUICK_TEMPLATES = [

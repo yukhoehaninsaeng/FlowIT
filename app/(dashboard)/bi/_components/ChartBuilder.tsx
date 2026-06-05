@@ -6,7 +6,7 @@ import { ChartRenderer, type DataPoint } from './ChartRenderer'
 import type { ChartConfig } from './chartTypes'
 import {
   DIMENSIONS, DIMENSION_CATEGORIES, METRICS_BY_DIM, CHART_TYPES,
-  PERIODS, QUICK_TEMPLATES, type DimensionCategory,
+  PERIODS, QUICK_TEMPLATES, recommendChartType, N_SERIES_DIMS, type DimensionCategory,
 } from './chartTypes'
 
 interface Props {
@@ -14,9 +14,9 @@ interface Props {
 }
 
 const CHART_TYPE_ICONS: Record<string, string> = {
-  bar: '▬▬', bar_h: '▬▬', line: '╱╲', area: '◣◢', pie: '◔', donut: '◎',
-  funnel: '▽▼', treemap: '▪◼', radial: '◎◉',
-  bar_grouped: '▬▬', bar_stacked: '▪▪', line_multi: '≈≈', scatter: '∴∵', combo: '▬╱',
+  bar: '▌▌', bar_h: '━━', line: '╱╲', area: '◣◢', pie: '◔', donut: '◎',
+  funnel: '▽▼', treemap: '▪◼',
+  bar_grouped: '▌▐', bar_stacked: '▬▬', line_multi: '≈≈', scatter: '∴∵', combo: '▌╱',
 }
 
 export function ChartBuilder({ onAddToDashboard }: Props) {
@@ -41,13 +41,13 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
   const currentMetrics  = METRICS_BY_DIM[dimension] ?? []
   const needsLimit      = ['sku_top'].includes(dimension)
 
-  // Auto-suggest chart type when dimension changes
+  // AI 추천: 차원 변경 시 최적 차트 자동 선택 (stale closure 방지: effect 내부에서 직접 계산)
   useEffect(() => {
     const opts = METRICS_BY_DIM[dimension] ?? []
     if (!opts.find(m => m.value === metric)) setMetric(opts[0]?.value ?? 'revenue')
     setMetric2('')
     setHasPreview(false)
-    if (currentDimInfo?.suggestedChart) setChartType(currentDimInfo.suggestedChart)
+    setChartType(recommendChartType(dimension))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dimension])
 
@@ -218,23 +218,46 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
 
             {/* Step 2: 차트 유형 */}
             <div>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">2 · 차트 유형</p>
-              <div className="grid grid-cols-5 md:grid-cols-7 lg:grid-cols-10 gap-2">
-                {CHART_TYPES.map(ct => (
-                  <button key={ct.value} onClick={() => setChartType(ct.value)} title={ct.desc}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${
-                      chartType === ct.value
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : ct.multiSeries
-                        ? 'border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50'
-                        : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:bg-blue-50'
-                    }`}>
-                    <span className="text-base leading-none">{CHART_TYPE_ICONS[ct.value] ?? '▪'}</span>
-                    <span className="text-[10px] font-medium leading-tight">{ct.label}</span>
-                    {ct.multiSeries && <span className={`text-[9px] ${chartType === ct.value ? 'text-blue-200' : 'text-blue-400'}`}>2계열</span>}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">2 · 차트 유형</p>
+                {!N_SERIES_DIMS.has(dimension) && (
+                  <span className="text-[10px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-0.5">
+                    AI 추천: {CHART_TYPES.find(t => t.value === recommendChartType(dimension))?.label}
+                  </span>
+                )}
               </div>
+
+              {N_SERIES_DIMS.has(dimension) ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 border border-blue-100">
+                  <span>📊</span>
+                  <span>채널별 N계열 데이터 → <strong>꺾은선</strong> 차트로 자동 표시됩니다 (채널별 월간 추이 전용)</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-5 md:grid-cols-7 lg:grid-cols-9 gap-2">
+                  {CHART_TYPES.map(ct => {
+                    const isRec = recommendChartType(dimension) === ct.value
+                    return (
+                      <button key={ct.value} onClick={() => setChartType(ct.value)} title={ct.desc}
+                        className={`relative flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${
+                          chartType === ct.value
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : isRec
+                            ? 'border-green-400 bg-green-50 text-gray-700 hover:border-green-500'
+                            : ct.multiSeries
+                            ? 'border-dashed border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50'
+                            : 'border-gray-200 text-gray-600 hover:border-blue-400 hover:bg-blue-50'
+                        }`}>
+                        {isRec && chartType !== ct.value && (
+                          <span className="absolute -top-1.5 -right-1.5 px-1 py-0.5 bg-green-500 text-white text-[8px] rounded-full font-bold leading-none">AI</span>
+                        )}
+                        <span className="text-base leading-none">{CHART_TYPE_ICONS[ct.value] ?? '▪'}</span>
+                        <span className="text-[10px] font-medium leading-tight">{ct.label}</span>
+                        {ct.multiSeries && <span className={`text-[9px] ${chartType === ct.value ? 'text-blue-200' : 'text-blue-400'}`}>2계열</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Step 3: 미리보기 */}
