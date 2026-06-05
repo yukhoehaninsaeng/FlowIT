@@ -25,11 +25,10 @@ export const CHART_COLORS = [
 
 const thisYear = new Date().getFullYear()
 export const PERIODS = [
-  { label: '이번달',          value: 'monthly' },
-  { label: '분기',            value: 'quarterly' },
-  { label: `${thisYear}년`,   value: `year_${thisYear}` },
-  { label: `${thisYear-1}년`, value: `year_${thisYear - 1}` },
-  { label: `${thisYear-2}년`, value: `year_${thisYear - 2}` },
+  { label: '이번달',    value: 'this_month', desc: '당월 일별 추이' },
+  { label: '1개월 전',  value: 'last_month', desc: '전월 일별 추이' },
+  { label: '6개월',     value: '6months',    desc: '최근 6개월' },
+  { label: '1년',       value: '1year',      desc: `${thisYear - 1}년 1~12월` },
 ]
 
 export type DimensionCategory = '매출·채널' | '상품' | '고객' | '영업' | '마케팅' | '물류·반품'

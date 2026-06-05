@@ -6,28 +6,68 @@ const PAID = ['PAID', 'SHIPPED', 'DELIVERED']
 const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 const STAGE_ORDER = ['LEAD', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'CLOSED_WON', 'CLOSED_LOST']
 
-function parsePeriod(period: string): { start: Date; end?: Date; year?: number } {
+function parsePeriod(period: string): { start: Date; end: Date; granularity: 'day' | 'month'; year?: number } {
   const now = new Date()
-  const yearMatch = period.match(/^year_(\d{4})$/)
-  if (yearMatch) {
-    const yr = parseInt(yearMatch[1])
-    return { start: new Date(yr, 0, 1), end: new Date(yr + 1, 0, 1), year: yr }
+  const y = now.getFullYear(), m = now.getMonth()
+  const eod = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+
+  switch (period) {
+    case 'this_month':
+      return { start: new Date(y, m, 1), end: eod(now), granularity: 'day' }
+    case 'last_month':
+      return { start: new Date(y, m - 1, 1), end: eod(new Date(y, m, 0)), granularity: 'day' }
+    case '6months':
+      return { start: new Date(y, m - 5, 1), end: eod(new Date(y, m + 1, 0)), granularity: 'month' }
+    case '1year':
+      return { start: new Date(y - 1, 0, 1), end: new Date(y - 1, 11, 31, 23, 59, 59, 999), granularity: 'month', year: y - 1 }
+    case 'monthly':
+      return { start: new Date(y, m, 1), end: eod(now), granularity: 'day' }
+    case 'quarterly':
+      return { start: new Date(y, Math.floor(m / 3) * 3, 1), end: eod(now), granularity: 'month' }
+    default: {
+      const yr = parseInt(period.match(/^year_(\d{4})$/)?.[1] ?? '0') || y
+      return { start: new Date(yr, 0, 1), end: new Date(yr, 11, 31, 23, 59, 59, 999), granularity: 'month', year: yr }
+    }
   }
-  if (period === 'monthly')   return { start: new Date(now.getFullYear(), now.getMonth(), 1) }
-  if (period === 'quarterly') return { start: new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1) }
-  return { start: new Date(now.getFullYear(), 0, 1), year: now.getFullYear() }
+}
+
+function allDays(start: Date, end: Date): string[] {
+  const days: string[] = []
+  const d = new Date(start.getFullYear(), start.getMonth(), start.getDate())
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate())
+  while (d <= endDay) {
+    days.push(d.toISOString().substring(0, 10))
+    d.setDate(d.getDate() + 1)
+  }
+  return days
+}
+
+function allMonths(start: Date, end: Date): string[] {
+  const months: string[] = []
+  const d = new Date(start.getFullYear(), start.getMonth(), 1)
+  const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
+  while (d <= endMonth) {
+    months.push(d.toISOString().substring(0, 7))
+    d.setMonth(d.getMonth() + 1)
+  }
+  return months
+}
+
+function dayLabel(dayKey: string): string {
+  const [, mo, dd] = dayKey.split('-')
+  return `${parseInt(mo)}/${parseInt(dd)}`
 }
 
 export const GET = withAuth(async (req) => {
   const { searchParams } = req.nextUrl
   const type   = searchParams.get('type')   ?? 'sales'
-  const period = searchParams.get('period') ?? 'monthly'
+  const period = searchParams.get('period') ?? 'this_month'
   const skuId  = searchParams.get('skuId')
 
-  const { start: periodStart, end: periodEnd, year: periodYear } = parsePeriod(period)
+  const { start: periodStart, end: periodEnd, granularity, year: periodYear } = parsePeriod(period)
 
   function dateWhere() {
-    return periodEnd ? { gte: periodStart, lt: periodEnd } : { gte: periodStart }
+    return { gte: periodStart, lte: periodEnd }
   }
 
   // ── 캐시 (flex는 차원별로 캐시 키 구분) ─────────────────────────────
@@ -102,28 +142,47 @@ export const GET = withAuth(async (req) => {
 
     let rawRows: Row[] = []
 
-    /* ── 채널별 월간 추이 (N-series) ── */
+    /* ── 채널별 추이 (N-series) ── */
     if (dimension === 'channel_trend') {
       const orders = await prisma.order.findMany({
         where: { status: { in: PAID }, orderedAt: dateWhere() },
         select: { orderedAt: true, totalAmount: true, channel: true },
       })
       const channels = [...new Set(orders.map(o => o.channel))].sort()
-      const grouped: Record<string, Record<string, number>> = {}
-      for (const o of orders) {
-        const month = o.orderedAt.toISOString().substring(0, 7)
-        if (!grouped[month]) grouped[month] = {}
-        const val = metric === 'count' ? 1 : Number(o.totalAmount)
-        grouped[month][o.channel] = (grouped[month][o.channel] ?? 0) + val
-      }
-      const rows = Object.entries(grouped)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([label, vals]) => {
-          const row: Record<string, string | number> = { label }
+
+      if (granularity === 'day') {
+        const grouped: Record<string, Record<string, number>> = {}
+        for (const o of orders) {
+          const key = o.orderedAt.toISOString().substring(0, 10)
+          if (!grouped[key]) grouped[key] = {}
+          const val = metric === 'count' ? 1 : Number(o.totalAmount)
+          grouped[key][o.channel] = (grouped[key][o.channel] ?? 0) + val
+        }
+        const days = allDays(periodStart, periodEnd)
+        const rows = days.map(day => {
+          const vals = grouped[day] ?? {}
+          const row: Record<string, string | number> = { label: dayLabel(day) }
           for (const ch of channels) row[ch] = vals[ch] ?? 0
           return row
         })
-      return NextResponse.json({ data: rows, series: channels })
+        return NextResponse.json({ data: rows, series: channels })
+      } else {
+        const grouped: Record<string, Record<string, number>> = {}
+        for (const o of orders) {
+          const key = o.orderedAt.toISOString().substring(0, 7)
+          if (!grouped[key]) grouped[key] = {}
+          const val = metric === 'count' ? 1 : Number(o.totalAmount)
+          grouped[key][o.channel] = (grouped[key][o.channel] ?? 0) + val
+        }
+        const months = allMonths(periodStart, periodEnd)
+        const rows = months.map(month => {
+          const vals = grouped[month] ?? {}
+          const row: Record<string, string | number> = { label: month }
+          for (const ch of channels) row[ch] = vals[ch] ?? 0
+          return row
+        })
+        return NextResponse.json({ data: rows, series: channels })
+      }
     }
 
     /* ── 채널별 ── */
@@ -140,35 +199,54 @@ export const GET = withAuth(async (req) => {
         return row
       })
 
-    /* ── 월별 추이 ── */
+    /* ── 일별/월별 추이 ── */
     } else if (dimension === 'month') {
       const orders = await prisma.order.findMany({
         where: { status: { in: PAID }, orderedAt: dateWhere() },
         select: { orderedAt: true, totalAmount: true },
         orderBy: { orderedAt: 'asc' },
       })
-      const grouped: Record<string, { revenue: number; count: number }> = {}
-      for (const o of orders) {
-        const key = o.orderedAt.toISOString().substring(0, 7)
-        if (!grouped[key]) grouped[key] = { revenue: 0, count: 0 }
-        grouped[key].revenue += Number(o.totalAmount); grouped[key].count++
+
+      if (granularity === 'day') {
+        const grouped: Record<string, { revenue: number; count: number }> = {}
+        for (const o of orders) {
+          const key = o.orderedAt.toISOString().substring(0, 10)
+          if (!grouped[key]) grouped[key] = { revenue: 0, count: 0 }
+          grouped[key].revenue += Number(o.totalAmount); grouped[key].count++
+        }
+        const days = allDays(periodStart, periodEnd)
+        rawRows = days.map(day => {
+          const v = grouped[day] ?? { revenue: 0, count: 0 }
+          const row: Row = { label: dayLabel(day), value: pickMetric(metric, v.revenue, v.count, 0, 0) }
+          if (metric2) row.value2 = pickMetric(metric2, v.revenue, v.count, 0, 0)
+          return row
+        })
+      } else {
+        const grouped: Record<string, { revenue: number; count: number }> = {}
+        for (const o of orders) {
+          const key = o.orderedAt.toISOString().substring(0, 7)
+          if (!grouped[key]) grouped[key] = { revenue: 0, count: 0 }
+          grouped[key].revenue += Number(o.totalAmount); grouped[key].count++
+        }
+        const months = allMonths(periodStart, periodEnd)
+        rawRows = months.map(month => {
+          const v = grouped[month] ?? { revenue: 0, count: 0 }
+          const row: Row = { label: month, value: pickMetric(metric, v.revenue, v.count, 0, 0) }
+          if (metric2) row.value2 = pickMetric(metric2, v.revenue, v.count, 0, 0)
+          return row
+        })
       }
-      rawRows = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([label, v]) => {
-        const row: Row = { label, value: pickMetric(metric, v.revenue, v.count, 0, 0) }
-        if (metric2) row.value2 = pickMetric(metric2, v.revenue, v.count, 0, 0)
-        return row
-      })
 
     /* ── 전년 동기 비교 ── */
     } else if (dimension === 'month_yoy') {
       const yr = periodYear ?? new Date().getFullYear()
       const [curOrders, prevOrders] = await Promise.all([
         prisma.order.findMany({
-          where: { status: { in: PAID }, orderedAt: { gte: new Date(yr, 0, 1), lt: new Date(yr + 1, 0, 1) } },
+          where: { status: { in: PAID }, orderedAt: { gte: new Date(yr, 0, 1), lte: new Date(yr, 11, 31, 23, 59, 59, 999) } },
           select: { orderedAt: true, totalAmount: true },
         }),
         prisma.order.findMany({
-          where: { status: { in: PAID }, orderedAt: { gte: new Date(yr - 1, 0, 1), lt: new Date(yr, 0, 1) } },
+          where: { status: { in: PAID }, orderedAt: { gte: new Date(yr - 1, 0, 1), lte: new Date(yr - 1, 11, 31, 23, 59, 59, 999) } },
           select: { orderedAt: true, totalAmount: true },
         }),
       ])
@@ -322,25 +400,45 @@ export const GET = withAuth(async (req) => {
         return row
       })
 
-    /* ── 반품 월별 추이 ── */
+    /* ── 반품 추이 ── */
     } else if (dimension === 'return_trend') {
       const returns = await prisma.return.findMany({
         where: { createdAt: dateWhere() },
         select: { createdAt: true, refundAmount: true },
         orderBy: { createdAt: 'asc' },
       })
-      const grouped: Record<string, { count: number; refund: number }> = {}
-      for (const r of returns) {
-        const key = r.createdAt.toISOString().substring(0, 7)
-        if (!grouped[key]) grouped[key] = { count: 0, refund: 0 }
-        grouped[key].count++
-        grouped[key].refund += Number(r.refundAmount ?? 0)
+
+      if (granularity === 'day') {
+        const grouped: Record<string, { count: number; refund: number }> = {}
+        for (const r of returns) {
+          const key = r.createdAt.toISOString().substring(0, 10)
+          if (!grouped[key]) grouped[key] = { count: 0, refund: 0 }
+          grouped[key].count++
+          grouped[key].refund += Number(r.refundAmount ?? 0)
+        }
+        const days = allDays(periodStart, periodEnd)
+        rawRows = days.map(day => {
+          const v = grouped[day] ?? { count: 0, refund: 0 }
+          const row: Row = { label: dayLabel(day), value: metric === 'refund' ? v.refund : v.count }
+          if (metric2) row.value2 = metric2 === 'refund' ? v.refund : v.count
+          return row
+        })
+      } else {
+        const grouped: Record<string, { count: number; refund: number }> = {}
+        for (const r of returns) {
+          const key = r.createdAt.toISOString().substring(0, 7)
+          if (!grouped[key]) grouped[key] = { count: 0, refund: 0 }
+          grouped[key].count++
+          grouped[key].refund += Number(r.refundAmount ?? 0)
+        }
+        const months = allMonths(periodStart, periodEnd)
+        rawRows = months.map(month => {
+          const v = grouped[month] ?? { count: 0, refund: 0 }
+          const row: Row = { label: month, value: metric === 'refund' ? v.refund : v.count }
+          if (metric2) row.value2 = metric2 === 'refund' ? v.refund : v.count
+          return row
+        })
       }
-      rawRows = Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([label, v]) => {
-        const row: Row = { label, value: metric === 'refund' ? v.refund : v.count }
-        if (metric2) row.value2 = metric2 === 'refund' ? v.refund : v.count
-        return row
-      })
 
     /* ── 배송사별 ── */
     } else if (dimension === 'carrier') {

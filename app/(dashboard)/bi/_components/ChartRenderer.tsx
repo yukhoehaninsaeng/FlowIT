@@ -74,7 +74,7 @@ export function ChartRenderer({
           <Tooltip formatter={(v: unknown, name: unknown) => [isCurrency ? formatKRW(Number(v)) : Number(v).toLocaleString(), String(name)]} />
           <Legend />
           {series.map((key, i) => (
-            <Line key={key} type="monotone" dataKey={key}
+            <Line key={key} type="linear" dataKey={key}
               stroke={getChannelColor(key, i)}
               strokeWidth={2} dot={{ r: 3 }} name={key} />
           ))}
@@ -254,8 +254,8 @@ export function ChartRenderer({
           <Tooltip formatter={ttFmt} />
           <Legend formatter={lgFmt} />
           <ReferenceLine yAxisId="l" y={0} stroke="#d1d5db" strokeDasharray="4 4" />
-          <Line yAxisId="l" type="monotone" dataKey="value"  stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} name={label1} />
-          <Line yAxisId="r" type="monotone" dataKey="value2" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} name={label2} />
+          <Line yAxisId="l" type="linear" dataKey="value"  stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 3 }} name={label1} />
+          <Line yAxisId="r" type="linear" dataKey="value2" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} name={label2} />
         </LineChart>
       </ResponsiveContainer>
     )
@@ -273,7 +273,7 @@ export function ChartRenderer({
           <Tooltip formatter={ttFmt} />
           <Legend formatter={lgFmt} />
           <Bar  yAxisId="l" dataKey="value"  fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} name={label1} />
-          <Line yAxisId="r" type="monotone" dataKey="value2" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} name={label2} />
+          <Line yAxisId="r" type="linear" dataKey="value2" stroke={CHART_COLORS[2]} strokeWidth={2} dot={{ r: 3 }} name={label2} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -289,7 +289,7 @@ export function ChartRenderer({
           <YAxis tick={{ fontSize: 11 }} tickFormatter={tf1} />
           <Tooltip formatter={(v: unknown) => fmt1(Number(v))} />
           <ReferenceLine y={0} stroke="#d1d5db" strokeDasharray="4 4" />
-          <Line type="monotone" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
+          <Line type="linear" dataKey="value" stroke={CHART_COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
         </LineChart>
       </ResponsiveContainer>
     )
@@ -310,7 +310,7 @@ export function ChartRenderer({
           <XAxis dataKey="label" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} tickFormatter={tf1} />
           <Tooltip formatter={(v: unknown) => fmt1(Number(v))} />
-          <Area type="monotone" dataKey="value" stroke={CHART_COLORS[0]} fill="url(#aGrad)" strokeWidth={2} />
+          <Area type="linear" dataKey="value" stroke={CHART_COLORS[0]} fill="url(#aGrad)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
     )
