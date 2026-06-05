@@ -6,6 +6,8 @@ export interface ChartConfig {
   metric2?: string
   chartType: string
   period: string
+  customStart?: string  // YYYY-MM-DD, only when period === 'custom'
+  customEnd?: string    // YYYY-MM-DD, only when period === 'custom'
   colSpan: 3 | 6 | 9 | 12
   height: 'sm' | 'md' | 'lg'
   limit?: number
@@ -29,6 +31,7 @@ export const PERIODS = [
   { label: '1개월 전',  value: 'last_month', desc: '전월 일별 추이' },
   { label: '6개월',     value: '6months',    desc: '최근 6개월' },
   { label: '1년',       value: '1year',      desc: `${thisYear - 1}년 1~12월` },
+  { label: '직접 지정', value: 'custom',     desc: '날짜 범위 직접 선택' },
 ]
 
 export type DimensionCategory = '매출·채널' | '상품' | '고객' | '영업' | '마케팅' | '물류·반품'

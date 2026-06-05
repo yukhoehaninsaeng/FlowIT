@@ -144,6 +144,12 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
   const [autoCorrectMsg, setAutoCorrectMsg] = useState('')
   const [dataConfidence, setDataConfidence] = useState<number | null>(null)
 
+  // 직접 지정 기간
+  const todayStr = new Date().toISOString().substring(0, 10)
+  const firstOfMonthStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().substring(0, 10)
+  const [customStart, setCustomStart] = useState(firstOfMonthStr)
+  const [customEnd,   setCustomEnd]   = useState(todayStr)
+
   const currentType    = CHART_TYPES.find(t => t.value === chartType)
   const isMulti        = currentType?.multiSeries ?? false
   const currentMetrics = METRICS_BY_DIM[dimension] ?? []
@@ -176,9 +182,11 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
   const fetchPreview = useCallback(async () => {
     setPreviewing(true); setHasPreview(false); setInsights([]); setDataConfidence(null)
     try {
-      const m2  = isMulti && metric2 ? `&metric2=${metric2}` : ''
-      const lim = needsLimit ? `&limit=${limit}` : ''
-      const r   = await fetch(`/api/bi?type=flex&dimension=${dimension}&metric=${metric}${m2}&period=${period}${lim}`)
+      const m2         = isMulti && metric2 ? `&metric2=${metric2}` : ''
+      const lim        = needsLimit ? `&limit=${limit}` : ''
+      const customPart = period === 'custom' && customStart && customEnd
+        ? `&customStart=${customStart}&customEnd=${customEnd}` : ''
+      const r = await fetch(`/api/bi?type=flex&dimension=${dimension}&metric=${metric}${m2}&period=${period}${lim}${customPart}`)
       const d   = await r.json()
       const rows: DataPoint[] = d.data ?? []
 
@@ -200,7 +208,7 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
         setDataConfidence(computeConfidence(rows, dimension))
       }
     } finally { setPreviewing(false) }
-  }, [dimension, metric, metric2, chartType, period, isMulti, limit, needsLimit, dataType, metricInfo])
+  }, [dimension, metric, metric2, chartType, period, customStart, customEnd, isMulti, limit, needsLimit, dataType, metricInfo])
 
   function handleAdd() {
     if (!hasPreview || previewData.length === 0) return
@@ -213,6 +221,8 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
       title: title || `${dimInfo.label} · ${mInfo.label}`,
       dimension, metric, metric2: metric2 || undefined,
       chartType, period,
+      customStart: period === 'custom' ? customStart : undefined,
+      customEnd:   period === 'custom' ? customEnd   : undefined,
       colSpan: dimension === 'channel_trend' || chartType === 'funnel' ? 12 : 6,
       height: chartType === 'treemap' || chartType === 'funnel' ? 'lg' : 'md',
       limit: needsLimit ? limit : undefined,
@@ -356,6 +366,31 @@ export function ChartBuilder({ onAddToDashboard }: Props) {
                   </div>
                 )}
               </div>
+
+              {/* 직접 지정 날짜 피커 */}
+              {period === 'custom' && (
+                <div className="flex items-center gap-3 mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <span className="text-xs text-gray-500 flex-shrink-0">날짜 범위</span>
+                  <input type="date" value={customStart}
+                    max={customEnd || todayStr}
+                    onChange={e => { setCustomStart(e.target.value); setHasPreview(false) }}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <span className="text-xs text-gray-400">~</span>
+                  <input type="date" value={customEnd}
+                    min={customStart}
+                    max={todayStr}
+                    onChange={e => { setCustomEnd(e.target.value); setHasPreview(false) }}
+                    className="px-3 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  <span className="text-[11px] text-gray-400">
+                    {customStart && customEnd
+                      ? (() => {
+                          const days = Math.round((new Date(customEnd).getTime() - new Date(customStart).getTime()) / 86400000)
+                          return days <= 62 ? `${days}일 · 일별 집계` : `${Math.ceil(days / 30)}개월 · 월별 집계`
+                        })()
+                      : ''}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Step 2: 차트 유형 */}

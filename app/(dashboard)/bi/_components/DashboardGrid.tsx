@@ -30,7 +30,9 @@ function ChartCard({
 
   useEffect(() => {
     setLoading(true)
-    const url = `/api/bi?type=flex&dimension=${config.dimension}&metric=${config.metric}${config.metric2 ? `&metric2=${config.metric2}` : ''}&period=${config.period}${config.limit ? `&limit=${config.limit}` : ''}`
+    const customPart = config.period === 'custom' && config.customStart && config.customEnd
+      ? `&customStart=${config.customStart}&customEnd=${config.customEnd}` : ''
+    const url = `/api/bi?type=flex&dimension=${config.dimension}&metric=${config.metric}${config.metric2 ? `&metric2=${config.metric2}` : ''}&period=${config.period}${customPart}${config.limit ? `&limit=${config.limit}` : ''}`
     fetch(url).then(r => r.json()).then(d => {
       setData(d.data ?? [])
       if (d.series) setSeries(d.series)

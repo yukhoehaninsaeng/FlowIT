@@ -64,7 +64,18 @@ export const GET = withAuth(async (req) => {
   const period = searchParams.get('period') ?? 'this_month'
   const skuId  = searchParams.get('skuId')
 
-  const { start: periodStart, end: periodEnd, granularity, year: periodYear } = parsePeriod(period)
+  let parsedPeriod: ReturnType<typeof parsePeriod>
+  if (period === 'custom') {
+    const cs = searchParams.get('customStart')  // YYYY-MM-DD
+    const ce = searchParams.get('customEnd')    // YYYY-MM-DD
+    const start = cs ? new Date(cs + 'T00:00:00') : new Date(new Date().getFullYear(), 0, 1)
+    const end   = ce ? new Date(ce + 'T23:59:59') : new Date()
+    const diffDays = Math.round((end.getTime() - start.getTime()) / 86400000)
+    parsedPeriod = { start, end, granularity: diffDays <= 62 ? 'day' : 'month' }
+  } else {
+    parsedPeriod = parsePeriod(period)
+  }
+  const { start: periodStart, end: periodEnd, granularity, year: periodYear } = parsedPeriod
 
   function dateWhere() {
     return { gte: periodStart, lte: periodEnd }
@@ -73,7 +84,10 @@ export const GET = withAuth(async (req) => {
   // ── 캐시 (flex는 차원별로 캐시 키 구분) ─────────────────────────────
   const dimension = searchParams.get('dimension') ?? ''
   const now = new Date()
-  const cacheKey = `${type}_${dimension}_${period}_${now.getFullYear()}_${now.getMonth()}`
+  const customSuffix = period === 'custom'
+    ? `_${searchParams.get('customStart') ?? ''}_${searchParams.get('customEnd') ?? ''}`
+    : `_${now.getFullYear()}_${now.getMonth()}`
+  const cacheKey = `${type}_${dimension}_${period}${customSuffix}`
   if (type !== 'flex') {
     const cached = await prisma.biCache.findUnique({ where: { key: cacheKey } })
     if (cached && (Date.now() - cached.computedAt.getTime()) < 3600000) {
