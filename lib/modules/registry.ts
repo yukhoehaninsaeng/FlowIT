@@ -213,30 +213,48 @@ export const MODULE_REGISTRY: ModuleDef[] = [
     description: '매출·채널·고객 분석 인터랙티브 차트',
     defaultEnabled: true,
   },
+  {
+    key: 'chart_builder',
+    label: '차트 빌더',
+    href: '/chart-builder',
+    icon: BarChart3,
+    category: 'analytics',
+    description: '커스텀 차트 생성, AI 추천, 내 대시보드 저장',
+    defaultEnabled: true,
+  },
+  {
+    key: 'channel_analytics',
+    label: '채널별 분석',
+    href: '/channel-analytics',
+    icon: BarChart3,
+    category: 'analytics',
+    description: '채널별 매출·판매량·반품률·전분기 대비 상세 테이블 (URL 상태 기반)',
+    defaultEnabled: true,
+  },
 ]
 
 export const INDUSTRY_PRESETS: Record<string, string[]> = {
   cosmetics: [
     'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
-    'campaigns', 'journeys', 'influencers', 'voc', 'bi',
+    'campaigns', 'journeys', 'influencers', 'voc', 'bi', 'chart_builder', 'channel_analytics',
   ],
   logistics: [
     'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
-    'settlements', 'lot_management', 'ai_forecast', 'bi',
+    'settlements', 'lot_management', 'ai_forecast', 'bi', 'chart_builder', 'channel_analytics',
   ],
   food: [
     'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
     'purchase_orders', 'warehouse', 'shipments', 'returns',
-    'lot_management', 'voc', 'bi',
+    'lot_management', 'voc', 'bi', 'chart_builder', 'channel_analytics',
   ],
   general: [
     'contact_logs', 'quotes', 'receivables', 'accounts', 'products',
     'dashboard', 'customers', 'sales', 'inventory',
-    'campaigns', 'bi',
+    'campaigns', 'bi', 'chart_builder', 'channel_analytics',
   ],
 }
 

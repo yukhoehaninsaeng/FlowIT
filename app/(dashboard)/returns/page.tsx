@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, Search, RotateCcw, X, Loader2 } from 'lucide-react'
+import { Plus, Search, RotateCcw, X, Loader2, ChevronRight } from 'lucide-react'
 
 interface Return {
   id: string; returnNo: string; status: string; reason: string | null
@@ -17,6 +17,20 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   rejected:   { label: '거절', color: 'bg-red-100 text-red-700' },
 }
 
+// 각 상태에서 이동 가능한 다음 단계
+const NEXT_STATUS: Record<string, { status: string; label: string; primary?: boolean }[]> = {
+  requested:  [{ status: 'received',   label: '수거 확인',  primary: true }],
+  received:   [{ status: 'inspecting', label: '검수 시작',  primary: true }],
+  inspecting: [
+    { status: 'restocked', label: '재입고 처리', primary: true },
+    { status: 'refunded',  label: '환불 처리' },
+    { status: 'rejected',  label: '반품 거절' },
+  ],
+  restocked: [],
+  refunded:  [],
+  rejected:  [],
+}
+
 const REASONS = ['단순 변심', '불량·파손', '오배송', '유통기한', '기타']
 
 export default function ReturnsPage() {
@@ -29,12 +43,35 @@ export default function ReturnsPage() {
   const [items, setItems] = useState([{ name: '', qty: 1 }])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [toast, setToast] = useState('')
 
   const load = () =>
     fetch('/api/returns').then(r => r.ok ? r.json() : { returns: [] })
       .then(d => setReturns(d.returns ?? [])).finally(() => setLoading(false))
 
   useEffect(() => { load() }, [])
+
+  async function handleStatusChange(returnId: string, newStatus: string, currentStatus: string) {
+    setUpdatingId(returnId)
+    try {
+      const r = await fetch(`/api/returns/${returnId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      if (!r.ok) { setToast('상태 변경 실패'); return }
+      setReturns(prev => prev.map(ret =>
+        ret.id === returnId ? { ...ret, status: newStatus } : ret
+      ))
+      if (newStatus === 'restocked') {
+        setToast('✅ 재입고 처리 완료 — 재고가 자동으로 복원되었습니다')
+        setTimeout(() => setToast(''), 4000)
+      }
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   async function handleCreate() {
     if (!form.reason) { setError('반품 사유를 선택하세요.'); return }
@@ -48,7 +85,7 @@ export default function ReturnsPage() {
           reason: form.reason,
           notes: form.notes || null,
           refundAmount: form.refundAmount ? Number(form.refundAmount) : null,
-          items: items.filter(i => i.name.trim()).map(i => ({ name: i.name, qty: i.qty })),
+          items: items.filter(i => i.name.trim()).map(i => ({ skuName: i.name, qty: i.qty })),
         }),
       })
       if (!r.ok) { const d = await r.json(); setError(d.error ?? '등록 실패'); return }
@@ -106,36 +143,71 @@ export default function ReturnsPage() {
         <table className="w-full text-sm">
           <thead><tr className="bg-gray-50 border-b border-gray-200">
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">반품번호</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">상태</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">현재 상태</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">사유</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">품목 수</th>
             <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">환불액</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">접수일</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">처리 액션</th>
           </tr></thead>
           <tbody className="divide-y divide-gray-100">
-            {loading ? <tr><td colSpan={6} className="py-12 text-center text-gray-400">로딩 중...</td></tr>
+            {loading ? <tr><td colSpan={7} className="py-12 text-center text-gray-400">로딩 중...</td></tr>
             : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="py-12 text-center">
+              <tr><td colSpan={7} className="py-12 text-center">
                 <RotateCcw size={32} className="mx-auto mb-2 text-gray-300" />
                 <p className="text-sm text-gray-400">반품 내역이 없습니다</p>
-                <button onClick={() => setShowModal(true)} className="mt-2 text-sm text-blue-600">반품 접수하기</button>
               </td></tr>
             ) : filtered.map(r => {
               const cfg = STATUS_CONFIG[r.status] ?? { label: r.status, color: 'bg-gray-100 text-gray-600' }
+              const nextSteps = NEXT_STATUS[r.status] ?? []
+              const isUpdating = updatingId === r.id
               return (
                 <tr key={r.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-mono text-xs text-blue-600">{r.returnNo}</td>
-                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}>{cfg.label}</span></td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${cfg.color}`}>{cfg.label}</span>
+                  </td>
                   <td className="px-4 py-3 text-gray-600 text-xs">{r.reason ?? '—'}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{r.itemCount}</td>
                   <td className="px-4 py-3 text-right text-gray-700">{r.refundAmount ? `₩${Number(r.refundAmount).toLocaleString()}` : '—'}</td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{new Date(r.createdAt).toLocaleDateString('ko-KR')}</td>
+                  <td className="px-4 py-3">
+                    {nextSteps.length > 0 ? (
+                      <div className="flex items-center gap-1.5">
+                        {nextSteps.map(step => (
+                          <button
+                            key={step.status}
+                            onClick={() => handleStatusChange(r.id, step.status, r.status)}
+                            disabled={isUpdating}
+                            className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-md border transition-colors disabled:opacity-50 ${
+                              step.primary
+                                ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                                : 'border-gray-200 text-gray-600 hover:border-gray-400'
+                            }`}
+                          >
+                            {isUpdating && step.primary && <Loader2 size={10} className="animate-spin" />}
+                            {step.label}
+                            {step.status === 'restocked' && <ChevronRight size={10} />}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400">처리 완료</span>
+                    )}
+                  </td>
                 </tr>
               )
             })}
           </tbody>
         </table>
       </div>
+
+      {/* 토스트 알림 */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 bg-gray-900 text-white text-sm rounded-xl shadow-lg">
+          {toast}
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

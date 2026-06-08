@@ -18,7 +18,12 @@ export const GET = withAuth(async (req, { params }) => {
     include: {
       identities: true,
       events: { orderBy: { occurredAt: 'desc' }, take: 20 },
-      orders: { orderBy: { orderedAt: 'desc' }, take: 10, include: { items: { include: { skuMaster: { select: { name: true } } } } } }
+      orders: { orderBy: { orderedAt: 'desc' }, take: 10, include: { items: { include: { skuMaster: { select: { name: true } } } } } },
+      campaignSends: {
+        orderBy: { sentAt: 'desc' },
+        take: 20,
+        include: { campaign: { select: { id: true, name: true, type: true } } }
+      }
     }
   })
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })

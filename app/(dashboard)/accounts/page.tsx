@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Search, Plus, X, Loader2, Building2, Phone, Mail, Pencil } from 'lucide-react'
+import Link from 'next/link'
 
 interface Account {
   id: string
@@ -183,10 +184,28 @@ export default function AccountsPage() {
                 )}
               </div>
 
-              <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-                <span>딜 {a._count.deals}건</span>
-                <span>상담 {a._count.contactLogs}건</span>
-                <span>미수금 {a._count.receivables}건</span>
+              {/* 연관 모듈 바로 이동 — SAP ERP 스타일 드릴다운 */}
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100 text-xs">
+                <Link
+                  href={`/sales?accountId=${a.id}`}
+                  className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
+                >
+                  딜 {a._count.deals}건
+                </Link>
+                <Link
+                  href={`/contact-logs?accountId=${a.id}`}
+                  className="text-gray-500 hover:text-blue-600 hover:underline transition-colors"
+                >
+                  상담 {a._count.contactLogs}건
+                </Link>
+                <Link
+                  href={`/receivables?accountId=${a.id}`}
+                  className={`hover:underline transition-colors font-medium ${
+                    a._count.receivables > 0 ? 'text-orange-600 hover:text-orange-700' : 'text-gray-500 hover:text-blue-600'
+                  }`}
+                >
+                  미수금 {a._count.receivables}건
+                </Link>
               </div>
             </div>
           ))}
