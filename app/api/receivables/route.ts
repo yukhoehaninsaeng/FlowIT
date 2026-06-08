@@ -15,9 +15,12 @@ export const GET = withAuth(async (req) => {
 
   const now = new Date()
 
+  const dealId = searchParams.get('dealId')
+
   const receivables = await prisma.receivable.findMany({
     where: {
       ...(accountId ? { accountId } : {}),
+      ...(dealId ? { dealId } : {}),
       ...(status ? { status } : {}),
     },
     include: {
